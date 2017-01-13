@@ -2,10 +2,13 @@ all: ntp_exporter
 
 # force people to use golangvend
 GOCC := env GOPATH=$(CURDIR)/.gopath go
-GOFLAGS := -ldflags '-s -w'
+GOCCFLAGS :=
+GOLDFLAGS := -s -w
+
+VERSION ?= $(shell git describe --tags --dirty)
 
 ntp_exporter: *.go
-	$(GOCC) build $(GOFLAGS) -o $@ github.com/sapcc/ntp_exporter
+	$(GOCC) build $(GOCCFLAGS) -ldflags "$(GOLDFLAGS) -X main.version=$(VERSION)" -o $@ github.com/sapcc/ntp_exporter
 
 vendor:
 	@golangvend

@@ -31,7 +31,7 @@ import (
 	"github.com/prometheus/common/log"
 )
 
-var version string
+var version string // will be substituted at compile-time
 
 func main() {
 	var (
