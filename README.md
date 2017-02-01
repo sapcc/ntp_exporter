@@ -1,6 +1,6 @@
 # ntp\_exporter
 
-This is a Prometheus exporter that, when running on a node, checks the offset
+This is a Prometheus exporter that, when running on a node, checks the drift
 of that node's clock against a given NTP server.
 
 ## Installation

@@ -30,7 +30,7 @@ import (
 )
 
 var (
-	offset = prometheus.NewGauge(prometheus.GaugeOpts{
+	drift = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: "ntp",
 		Name:      "drift_seconds",
 		Help:      "Difference between system time and NTP time.",
@@ -55,7 +55,7 @@ type Collector struct {
 
 //Describe implements the prometheus.Collector interface.
 func (c Collector) Describe(ch chan<- *prometheus.Desc) {
-	offset.Describe(ch)
+	drift.Describe(ch)
 	stratum.Describe(ch)
 	scrapeDuration.Describe(ch)
 }
@@ -65,7 +65,7 @@ func (c Collector) Collect(ch chan<- prometheus.Metric) {
 	err := c.measure()
 	//only report data when measurement was successful
 	if err == nil {
-		offset.Collect(ch)
+		drift.Collect(ch)
 		stratum.Collect(ch)
 		scrapeDuration.Collect(ch)
 	} else {
@@ -81,7 +81,7 @@ func (c Collector) measure() error {
 	if err != nil {
 		return fmt.Errorf("couldn't get NTP drift: %s", err)
 	}
-	offset.Set(resp.ClockOffset.Seconds())
+	drift.Set(resp.ClockOffset.Seconds())
 	stratum.Set(float64(resp.Stratum))
 
 	scrapeDuration.Observe(time.Since(begin).Seconds())
