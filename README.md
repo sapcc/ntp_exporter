@@ -13,7 +13,7 @@ make
 
 The binary can also be installed with `go get`:
 ```bash
-go get github.com/sapcc/swift-drive-autopilot
+go get github.com/sapcc/ntp_exporter
 ```
 
 To build the Docker container:

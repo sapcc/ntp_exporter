@@ -27,6 +27,7 @@ import (
 	"github.com/beevik/ntp"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/log"
+	"sort"
 )
 
 var (
@@ -54,14 +55,14 @@ type Collector struct {
 }
 
 //Describe implements the prometheus.Collector interface.
-func (c Collector) Describe(ch chan<- *prometheus.Desc) {
+func (c Collector) Describe(ch chan <- *prometheus.Desc) {
 	drift.Describe(ch)
 	stratum.Describe(ch)
 	scrapeDuration.Describe(ch)
 }
 
 //Collect implements the prometheus.Collector interface.
-func (c Collector) Collect(ch chan<- prometheus.Metric) {
+func (c Collector) Collect(ch chan <- prometheus.Metric) {
 	err := c.measure()
 	//only report data when measurement was successful
 	if err == nil {
@@ -77,13 +78,58 @@ func (c Collector) Collect(ch chan<- prometheus.Metric) {
 func (c Collector) measure() error {
 	begin := time.Now()
 
-	resp, err := ntp.Query(c.NtpServer, c.NtpProtocolVersion)
+	clockOffset, strat, err := c.getClockOffsetAndStratum()
+
 	if err != nil {
 		return fmt.Errorf("couldn't get NTP drift: %s", err)
 	}
-	drift.Set(resp.ClockOffset.Seconds())
-	stratum.Set(float64(resp.Stratum))
+
+	//if clock drift is unusually high (>10ms): repeat measurements for 30 seconds and submit median value
+	if clockOffset > 0.01 {
+		var measurementsClockOffset []float64
+		var measurementsStratum     []float64
+
+		for time.Since(begin).Seconds() < 30 {
+			clockOffset, stratum, err := c.getClockOffsetAndStratum()
+
+			if err != nil {
+				return fmt.Errorf("couldn't get NTP drift: %s", err)
+			}
+
+			measurementsClockOffset = append(measurementsClockOffset, clockOffset)
+			measurementsStratum = append(measurementsStratum, stratum)
+
+		}
+
+		clockOffset = calculateMedian(measurementsClockOffset)
+		strat = calculateMedian(measurementsStratum)
+	}
+
+	drift.Set(clockOffset)
+	stratum.Set(strat)
 
 	scrapeDuration.Observe(time.Since(begin).Seconds())
 	return nil
+}
+
+func (c Collector) getClockOffsetAndStratum() (clockOffset float64, strat float64, err error) {
+	resp, err := ntp.Query(c.NtpServer, c.NtpProtocolVersion)
+	if err != nil {
+		return 0, 0, fmt.Errorf("couldn't get NTP drift: %s", err)
+	}
+	clockOffset = resp.ClockOffset.Seconds()
+	strat = float64(resp.Stratum)
+	return clockOffset, strat, nil
+}
+
+func calculateMedian(slice []float64) (median float64) {
+
+	sort.Float64s(slice)
+
+	middle := len(slice) / 2
+	median = slice[middle]
+	if len(slice)%2 == 0 {
+		median = (median + slice[middle-1]) / 2
+	}
+	return median
 }
