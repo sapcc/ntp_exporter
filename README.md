@@ -38,7 +38,7 @@ Command-line options: (Only `-ntp.server` is required.)
   -version
         Print version information.
   -web.listen-address string
-        Address on which to expose metrics and web interface. (default ":9100")
+        Address on which to expose metrics and web interface. (default ":9558")
   -web.telemetry-path string
         Path under which to expose metrics. (default "/metrics")
 ```
