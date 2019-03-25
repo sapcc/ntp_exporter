@@ -31,11 +31,11 @@ import (
 )
 
 var (
-	drift = prometheus.NewGauge(prometheus.GaugeOpts{
+	drift = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: "ntp",
 		Name:      "drift_seconds",
 		Help:      "Difference between system time and NTP time.",
-	})
+	}, []string{"server"})
 	stratum = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: "ntp",
 		Name:      "stratum",
@@ -105,7 +105,7 @@ func (c Collector) measure() error {
 		strat = calculateMedian(measurementsStratum)
 	}
 
-	drift.Set(clockOffset)
+	drift.WithLabelValues(c.NtpServer).Set(clockOffset)
 	stratum.Set(strat)
 
 	scrapeDuration.Observe(time.Since(begin).Seconds())
