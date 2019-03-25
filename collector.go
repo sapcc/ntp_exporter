@@ -22,12 +22,12 @@ package main
 
 import (
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/beevik/ntp"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/log"
-	"sort"
 )
 
 var (
@@ -55,14 +55,14 @@ type Collector struct {
 }
 
 //Describe implements the prometheus.Collector interface.
-func (c Collector) Describe(ch chan <- *prometheus.Desc) {
+func (c Collector) Describe(ch chan<- *prometheus.Desc) {
 	drift.Describe(ch)
 	stratum.Describe(ch)
 	scrapeDuration.Describe(ch)
 }
 
 //Collect implements the prometheus.Collector interface.
-func (c Collector) Collect(ch chan <- prometheus.Metric) {
+func (c Collector) Collect(ch chan<- prometheus.Metric) {
 	err := c.measure()
 	//only report data when measurement was successful
 	if err == nil {
@@ -87,7 +87,7 @@ func (c Collector) measure() error {
 	//if clock drift is unusually high (>10ms): repeat measurements for 30 seconds and submit median value
 	if clockOffset > 0.01 {
 		var measurementsClockOffset []float64
-		var measurementsStratum     []float64
+		var measurementsStratum []float64
 
 		for time.Since(begin).Seconds() < 30 {
 			clockOffset, stratum, err := c.getClockOffsetAndStratum()
