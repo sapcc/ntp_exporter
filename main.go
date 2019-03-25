@@ -36,7 +36,7 @@ var version string // will be substituted at compile-time
 func main() {
 	var (
 		showVersion        = flag.Bool("version", false, "Print version information.")
-		listenAddress      = flag.String("web.listen-address", ":9100", "Address on which to expose metrics and web interface.")
+		listenAddress      = flag.String("web.listen-address", ":9559", "Address on which to expose metrics and web interface.")
 		metricsPath        = flag.String("web.telemetry-path", "/metrics", "Path under which to expose metrics.")
 		ntpServer          = flag.String("ntp.server", "", "NTP server to use (required).")
 		ntpProtocolVersion = flag.Int("ntp.protocol-version", 4, "NTP protocol version to use.")
