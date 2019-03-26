@@ -77,19 +77,21 @@ func (c Collector) Collect(ch chan<- prometheus.Metric) {
 }
 
 func (c Collector) measure() error {
-	begin := time.Now()
+	const highDrift = 0.01
 
+	begin := time.Now()
 	clockOffset, strat, err := c.getClockOffsetAndStratum()
 
 	if err != nil {
 		return fmt.Errorf("couldn't get NTP drift: %s", err)
 	}
 
-	//if clock drift is unusually high (>10ms): repeat measurements for 30 seconds and submit median value
-	if clockOffset > 0.01 {
+	//if clock drift is unusually high (e.g. >10ms): repeat measurements for 30 seconds and submit median value
+	if clockOffset > highDrift {
 		var measurementsClockOffset []float64
 		var measurementsStratum []float64
 
+		log.Warnf("clock drift is above %.2fs, taking multiple measurements for %.2f seconds", highDrift, c.NtpMeasurementDuration.Seconds())
 		for time.Since(begin) < c.NtpMeasurementDuration {
 			clockOffset, stratum, err := c.getClockOffsetAndStratum()
 
