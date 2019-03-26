@@ -50,8 +50,9 @@ var (
 
 //Collector implements the prometheus.Collector interface.
 type Collector struct {
-	NtpServer          string
-	NtpProtocolVersion int
+	NtpServer              string
+	NtpProtocolVersion     int
+	NtpMeasurementDuration time.Duration
 }
 
 //Describe implements the prometheus.Collector interface.
@@ -89,7 +90,7 @@ func (c Collector) measure() error {
 		var measurementsClockOffset []float64
 		var measurementsStratum []float64
 
-		for time.Since(begin).Seconds() < 30 {
+		for time.Since(begin) < c.NtpMeasurementDuration {
 			clockOffset, stratum, err := c.getClockOffsetAndStratum()
 
 			if err != nil {
