@@ -57,7 +57,7 @@ func main() {
 		log.Fatalf("invalid NTP protocol version %d; must be 2, 3, or 4", *ntpProtocolVersion)
 	}
 
-	log.Infoln("Starting ntp_exporter", version)
+	log.Infoln("starting ntp_exporter", version)
 	prometheus.MustRegister(Collector{*ntpServer, *ntpProtocolVersion, *ntpMeasurementDuration})
 	handler := promhttp.HandlerFor(prometheus.DefaultGatherer,
 		promhttp.HandlerOpts{ErrorLog: log.NewErrorLogger()})
@@ -73,7 +73,7 @@ func main() {
 			</html>`))
 	})
 
-	log.Infoln("Listening on", *listenAddress)
+	log.Infoln("listening on", *listenAddress)
 	err := http.ListenAndServe(*listenAddress, nil)
 	if err != nil {
 		log.Fatal(err)
