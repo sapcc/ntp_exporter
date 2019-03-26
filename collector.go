@@ -113,7 +113,8 @@ func (c Collector) measure() error {
 }
 
 func (c Collector) getClockOffsetAndStratum() (clockOffset float64, strat float64, err error) {
-	resp, err := ntp.Query(c.NtpServer, c.NtpProtocolVersion)
+	options := ntp.QueryOptions{ Version: c.NtpProtocolVersion }
+	resp, err := ntp.QueryWithOptions(c.NtpServer, options)
 	if err != nil {
 		return 0, 0, fmt.Errorf("couldn't get NTP drift: %s", err)
 	}
