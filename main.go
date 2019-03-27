@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -35,11 +36,12 @@ var version string // will be substituted at compile-time
 
 func main() {
 	var (
-		showVersion        = flag.Bool("version", false, "Print version information.")
-		listenAddress      = flag.String("web.listen-address", ":9559", "Address on which to expose metrics and web interface.")
-		metricsPath        = flag.String("web.telemetry-path", "/metrics", "Path under which to expose metrics.")
-		ntpServer          = flag.String("ntp.server", "", "NTP server to use (required).")
-		ntpProtocolVersion = flag.Int("ntp.protocol-version", 4, "NTP protocol version to use.")
+		showVersion            = flag.Bool("version", false, "Print version information.")
+		listenAddress          = flag.String("web.listen-address", ":9559", "Address on which to expose metrics and web interface.")
+		metricsPath            = flag.String("web.telemetry-path", "/metrics", "Path under which to expose metrics.")
+		ntpServer              = flag.String("ntp.server", "", "NTP server to use (required).")
+		ntpProtocolVersion     = flag.Int("ntp.protocol-version", 4, "NTP protocol version to use.")
+		ntpMeasurementDuration = flag.Duration("ntp.measurement-duration", 30*time.Second, "Duration of measurements in case of high (>10ms) drift.")
 	)
 	flag.Parse()
 
@@ -55,8 +57,8 @@ func main() {
 		log.Fatalf("invalid NTP protocol version %d; must be 2, 3, or 4", *ntpProtocolVersion)
 	}
 
-	log.Infoln("Starting ntp_exporter", version)
-	prometheus.MustRegister(Collector{*ntpServer, *ntpProtocolVersion})
+	log.Infoln("starting ntp_exporter", version)
+	prometheus.MustRegister(Collector{*ntpServer, *ntpProtocolVersion, *ntpMeasurementDuration})
 	handler := promhttp.HandlerFor(prometheus.DefaultGatherer,
 		promhttp.HandlerOpts{ErrorLog: log.NewErrorLogger()})
 
@@ -71,7 +73,7 @@ func main() {
 			</html>`))
 	})
 
-	log.Infoln("Listening on", *listenAddress)
+	log.Infoln("listening on", *listenAddress)
 	err := http.ListenAndServe(*listenAddress, nil)
 	if err != nil {
 		log.Fatal(err)
