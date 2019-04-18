@@ -31,6 +31,11 @@ import (
 )
 
 var (
+	serverIsUp = prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: "ntp",
+		Name:      "server_is_up",
+		Help:      "Ntp server is functionnal or not.",
+	})
 	drift = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: "ntp",
 		Name:      "drift_seconds",
@@ -57,6 +62,7 @@ type Collector struct {
 
 //Describe implements the prometheus.Collector interface.
 func (c Collector) Describe(ch chan<- *prometheus.Desc) {
+	serverIsUp.Describe(ch)
 	drift.Describe(ch)
 	stratum.Describe(ch)
 	scrapeDuration.Describe(ch)
@@ -67,10 +73,12 @@ func (c Collector) Collect(ch chan<- prometheus.Metric) {
 	err := c.measure()
 	//only report data when measurement was successful
 	if err == nil {
+		serverIsUp.Collect(ch)
 		drift.Collect(ch)
 		stratum.Collect(ch)
 		scrapeDuration.Collect(ch)
 	} else {
+		serverIsUp.Collect(ch)
 		log.Errorln(err)
 		return
 	}
@@ -83,6 +91,7 @@ func (c Collector) measure() error {
 	clockOffset, strat, err := c.getClockOffsetAndStratum()
 
 	if err != nil {
+		serverIsUp.Set(0)
 		return fmt.Errorf("couldn't get NTP drift: %s", err)
 	}
 
@@ -96,6 +105,7 @@ func (c Collector) measure() error {
 			clockOffset, stratum, err := c.getClockOffsetAndStratum()
 
 			if err != nil {
+				serverIsUp.Set(0)
 				return fmt.Errorf("couldn't get NTP drift: %s", err)
 			}
 
@@ -110,15 +120,16 @@ func (c Collector) measure() error {
 
 	drift.WithLabelValues(c.NtpServer).Set(clockOffset)
 	stratum.Set(strat)
-
+	serverIsUp.Set(1)
 	scrapeDuration.Observe(time.Since(begin).Seconds())
 	return nil
 }
 
 func (c Collector) getClockOffsetAndStratum() (clockOffset float64, strat float64, err error) {
-	options := ntp.QueryOptions{ Version: c.NtpProtocolVersion }
+	options := ntp.QueryOptions{Version: c.NtpProtocolVersion}
 	resp, err := ntp.QueryWithOptions(c.NtpServer, options)
 	if err != nil {
+		serverIsUp.Set(0)
 		return 0, 0, fmt.Errorf("couldn't get NTP drift: %s", err)
 	}
 	clockOffset = resp.ClockOffset.Seconds()
