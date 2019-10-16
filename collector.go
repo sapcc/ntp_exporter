@@ -30,36 +30,44 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-var (
-	drift = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Namespace: "ntp",
-		Name:      "drift_seconds",
-		Help:      "Difference between system time and NTP time.",
-	}, []string{"server"})
-	stratum = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: "ntp",
-		Name:      "stratum",
-		Help:      "Stratum of NTP server.",
-	})
-	scrapeDuration = prometheus.NewSummary(prometheus.SummaryOpts{
-		Namespace: "ntp",
-		Name:      "scrape_duration_seconds",
-		Help:      "ntp_exporter: Duration of a scrape job.",
-	})
-)
+func CollectorInitial(server string, protocol int, duration time.Duration) Collector {
+	return Collector{
+		NtpServer:              server,
+		NtpProtocolVersion:     protocol,
+		NtpMeasurementDuration: duration,
+		drift: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Namespace: "ntp",
+			Name:      "drift_seconds",
+			Help:      "Difference between system time and NTP time.",
+		}, []string{"server"}),
+		stratum: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: "ntp",
+			Name:      "stratum",
+			Help:      "Stratum of NTP server.",
+		}),
+		scrapeDuration: prometheus.NewSummary(prometheus.SummaryOpts{
+			Namespace: "ntp",
+			Name:      "scrape_duration_seconds",
+			Help:      "ntp_exporter: Duration of a scrape job.",
+		}),
+	}
+}
 
 //Collector implements the prometheus.Collector interface.
 type Collector struct {
 	NtpServer              string
 	NtpProtocolVersion     int
 	NtpMeasurementDuration time.Duration
+	drift                  *prometheus.GaugeVec
+	stratum                prometheus.Gauge
+	scrapeDuration         prometheus.Summary
 }
 
 //Describe implements the prometheus.Collector interface.
 func (c Collector) Describe(ch chan<- *prometheus.Desc) {
-	drift.Describe(ch)
-	stratum.Describe(ch)
-	scrapeDuration.Describe(ch)
+	c.drift.Describe(ch)
+	c.stratum.Describe(ch)
+	c.scrapeDuration.Describe(ch)
 }
 
 //Collect implements the prometheus.Collector interface.
@@ -67,9 +75,9 @@ func (c Collector) Collect(ch chan<- prometheus.Metric) {
 	err := c.measure()
 	//only report data when measurement was successful
 	if err == nil {
-		drift.Collect(ch)
-		stratum.Collect(ch)
-		scrapeDuration.Collect(ch)
+		c.drift.Collect(ch)
+		c.stratum.Collect(ch)
+		c.scrapeDuration.Collect(ch)
 	} else {
 		log.Println("ERROR:", err)
 		return
@@ -108,10 +116,10 @@ func (c Collector) measure() error {
 		strat = calculateMedian(measurementsStratum)
 	}
 
-	drift.WithLabelValues(c.NtpServer).Set(clockOffset)
-	stratum.Set(strat)
+	c.drift.WithLabelValues(c.NtpServer).Set(clockOffset)
+	c.stratum.Set(strat)
 
-	scrapeDuration.Observe(time.Since(begin).Seconds())
+	c.scrapeDuration.Observe(time.Since(begin).Seconds())
 	return nil
 }
 

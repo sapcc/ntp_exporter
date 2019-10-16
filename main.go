@@ -26,58 +26,112 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
-var version string // will be substituted at compile-time
+var (
+	version                string // will be substituted at compile-time
+	showVersion            bool
+	listenAddress          string
+	metricsPath            string
+	ntpServer              string
+	ntpProtocolVersion     int
+	ntpMeasurementDuration time.Duration
+	ntpSource              string
+)
 
 var logger = log.New(os.Stderr, "", log.LstdFlags)
 
 func main() {
-	var (
-		showVersion            = flag.Bool("version", false, "Print version information.")
-		listenAddress          = flag.String("web.listen-address", ":9559", "Address on which to expose metrics and web interface.")
-		metricsPath            = flag.String("web.telemetry-path", "/metrics", "Path under which to expose metrics.")
-		ntpServer              = flag.String("ntp.server", "", "NTP server to use (required).")
-		ntpProtocolVersion     = flag.Int("ntp.protocol-version", 4, "NTP protocol version to use.")
-		ntpMeasurementDuration = flag.Duration("ntp.measurement-duration", 30*time.Second, "Duration of measurements in case of high (>10ms) drift.")
-	)
-	flag.Parse()
-
-	if *showVersion {
+	if showVersion {
 		fmt.Println(version)
 		os.Exit(0)
 	}
 
-	if *ntpServer == "" {
-		logger.Fatalln("FATAL: no NTP server specified, see -ntp.server")
-	}
-	if *ntpProtocolVersion < 2 || *ntpProtocolVersion > 4 {
-		log.Fatalf("FATAL: invalid NTP protocol version %d; must be 2, 3, or 4\n", *ntpProtocolVersion)
+	if ntpSource == "cli" {
+		if ntpServer == "" {
+			logger.Fatalln("no NTP server specified, see -ntp.server")
+		}
+
+		if ntpProtocolVersion < 2 || ntpProtocolVersion > 4 {
+			log.Fatalf("invalid NTP protocol version %d; must be 2, 3, or 4", ntpProtocolVersion)
+		}
 	}
 
-	log.Println("starting ntp_exporter", version)
-	prometheus.MustRegister(Collector{*ntpServer, *ntpProtocolVersion, *ntpMeasurementDuration})
-	handler := promhttp.HandlerFor(prometheus.DefaultGatherer,
-		promhttp.HandlerOpts{ErrorLog: logger})
+	logger.Println("starting ntp_exporter", version)
 
-	http.Handle(*metricsPath, handler)
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte(`<html>
+	http.Handle(metricsPath, http.HandlerFunc(handlerMetrics))
+	http.HandleFunc("/", handlerDefault)
+
+	logger.Println("listening on", listenAddress)
+	err := http.ListenAndServe(listenAddress, nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+func init() {
+	flag.BoolVar(&showVersion, "version", false, "Print version information.")
+	flag.StringVar(&listenAddress, "web.listen-address", ":9559", "Address on which to expose metrics and web interface.")
+	flag.StringVar(&metricsPath, "web.telemetry-path", "/metrics", "Path under which to expose metrics.")
+	flag.StringVar(&ntpServer, "ntp.server", "", "NTP server to use (required).")
+	flag.IntVar(&ntpProtocolVersion, "ntp.protocol-version", 4, "NTP protocol version to use.")
+	flag.DurationVar(&ntpMeasurementDuration, "ntp.measurement-duration", 30*time.Second, "Duration of measurements in case of high (>10ms) drift.")
+	flag.StringVar(&ntpSource, "ntp.source", "cli", "source of information about ntp server (cli / http).")
+	flag.Parse()
+}
+
+func handlerMetrics(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
+
+	s := ntpServer
+	p := ntpProtocolVersion
+	d := ntpMeasurementDuration
+
+	if ntpSource == "http" {
+		for _, i := range []string{"server", "protocol", "duration"} {
+			if r.URL.Query().Get(i) == "" {
+				http.Error(w, fmt.Sprintf("Get parameter is empty: %s", i), http.StatusBadRequest)
+				return
+			}
+		}
+
+		s = r.URL.Query().Get("server")
+
+		if v, err := strconv.ParseInt(r.URL.Query().Get("protocol"), 10, 32); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		} else if v < 2 || v > 4 {
+			http.Error(w, fmt.Sprintf("invalid NTP protocol version %d; must be 2, 3, or 4", v), http.StatusBadRequest)
+			return
+		} else {
+			p = int(v)
+		}
+
+		if t, err := time.ParseDuration(r.URL.Query().Get("duration")); err == nil {
+			d = t
+		} else {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
+
+	registry := prometheus.NewRegistry()
+	registry.MustRegister(CollectorInitial(s, p, d))
+	h := promhttp.HandlerFor(registry, promhttp.HandlerOpts{ErrorLog: logger})
+	h.ServeHTTP(w, r)
+}
+
+func handlerDefault(w http.ResponseWriter, r *http.Request) {
+	w.Write([]byte(`<html>
 			<head><title>NTP Exporter</title></head>
 			<body>
 			<h1>NTP Exporter</h1>
-			<p><a href="` + *metricsPath + `">Metrics</a></p>
+			<p><a href="` + metricsPath + `">Metrics</a></p>
 			</body>
 			</html>`))
-	})
-
-	log.Println("listening on", *listenAddress)
-	err := http.ListenAndServe(*listenAddress, nil)
-	if err != nil {
-		log.Fatalln("FATAL:", err)
-	}
 }
