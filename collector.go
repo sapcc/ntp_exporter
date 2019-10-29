@@ -22,12 +22,12 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"sort"
 	"time"
 
 	"github.com/beevik/ntp"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/common/log"
 )
 
 var (
@@ -71,7 +71,7 @@ func (c Collector) Collect(ch chan<- prometheus.Metric) {
 		stratum.Collect(ch)
 		scrapeDuration.Collect(ch)
 	} else {
-		log.Errorln(err)
+		log.Println("ERROR:", err)
 		return
 	}
 }
@@ -91,7 +91,7 @@ func (c Collector) measure() error {
 		var measurementsClockOffset []float64
 		var measurementsStratum []float64
 
-		log.Warnf("clock drift is above %.2fs, taking multiple measurements for %.2f seconds", highDrift, c.NtpMeasurementDuration.Seconds())
+		log.Printf("WARN: clock drift is above %.2fs, taking multiple measurements for %.2f seconds", highDrift, c.NtpMeasurementDuration.Seconds())
 		for time.Since(begin) < c.NtpMeasurementDuration {
 			clockOffset, stratum, err := c.getClockOffsetAndStratum()
 
@@ -116,7 +116,7 @@ func (c Collector) measure() error {
 }
 
 func (c Collector) getClockOffsetAndStratum() (clockOffset float64, strat float64, err error) {
-	options := ntp.QueryOptions{ Version: c.NtpProtocolVersion }
+	options := ntp.QueryOptions{Version: c.NtpProtocolVersion}
 	resp, err := ntp.QueryWithOptions(c.NtpServer, options)
 	if err != nil {
 		return 0, 0, fmt.Errorf("couldn't get NTP drift: %s", err)

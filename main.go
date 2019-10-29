@@ -23,16 +23,18 @@ package main
 import (
 	"flag"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/prometheus/common/log"
 )
 
 var version string // will be substituted at compile-time
+
+var logger = log.New(os.Stderr, "", log.LstdFlags)
 
 func main() {
 	var (
@@ -51,18 +53,18 @@ func main() {
 	}
 
 	if *ntpServer == "" {
-		log.Fatalln("no NTP server specified, see -ntp.server")
+		logger.Fatalln("FATAL: no NTP server specified, see -ntp.server")
 	}
 	if *ntpProtocolVersion < 2 || *ntpProtocolVersion > 4 {
-		log.Fatalf("invalid NTP protocol version %d; must be 2, 3, or 4", *ntpProtocolVersion)
+		log.Fatalf("FATAL: invalid NTP protocol version %d; must be 2, 3, or 4\n", *ntpProtocolVersion)
 	}
 
-	log.Infoln("starting ntp_exporter", version)
+	log.Println("starting ntp_exporter", version)
 	prometheus.MustRegister(Collector{*ntpServer, *ntpProtocolVersion, *ntpMeasurementDuration})
 	handler := promhttp.HandlerFor(prometheus.DefaultGatherer,
-		promhttp.HandlerOpts{ErrorLog: log.NewErrorLogger()})
+		promhttp.HandlerOpts{ErrorLog: logger})
 
-	http.Handle(*metricsPath, prometheus.InstrumentHandler("prometheus", handler))
+	http.Handle(*metricsPath, handler)
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`<html>
 			<head><title>NTP Exporter</title></head>
@@ -73,9 +75,9 @@ func main() {
 			</html>`))
 	})
 
-	log.Infoln("listening on", *listenAddress)
+	log.Println("listening on", *listenAddress)
 	err := http.ListenAndServe(*listenAddress, nil)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalln("FATAL:", err)
 	}
 }
