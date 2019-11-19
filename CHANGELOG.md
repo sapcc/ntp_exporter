@@ -6,6 +6,9 @@ New features:
   multiple times and take the average, to avoid alerts because of a one-time
   mismeasurement.
 - The NTP server name is now reported as a metric label.
+- The option `-ntp.source` has been added. With `-ntp.source http`, the NTP
+  server is not defined through command-line options, but through query
+  parameters on the HTTP GET request.
 
 Changes:
 
