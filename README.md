@@ -25,23 +25,22 @@ make GOLDFLAGS="-w -linkmode external -extldflags -static" && docker build .
 
 ## Usage
 
-Command-line options: (Only `-ntp.server` is required.)
+Command-line options: (Only `-ntp.server` or `-ntp.source` is required.)
 
 ```plain
-  -log.format value
-        Set the log target and format. Example: "logger:syslog?appname=bob&local=7" or "logger:stdout?json=true" (default "logger:stderr")
-  -log.level value
-        Only log messages with the given severity or above. Valid levels: [debug, info, warn, error, fatal] (default "info")
-  -ntp.protocol-version int
-        NTP protocol version to use. (default 4)
-  -ntp.server string
-        NTP server to use (required).
+Usage of ntp_exporter:
   -ntp.measurement-duration duration
-        Repeat the measurements for the specified duration and calculate median in case the drift is unusually high (>10ms). (default 30s)
+     Duration of measurements in case of high (>10ms) drift. (default 30s)
+  -ntp.protocol-version int
+     NTP protocol version to use. (default 4)
+  -ntp.server string
+     NTP server to use (required).
+  -ntp.source string
+     source of information about ntp server (cli / http). (default "cli")
   -version
-        Print version information.
+     Print version information.
   -web.listen-address string
-        Address on which to expose metrics and web interface. (default ":9559")
+     Address on which to expose metrics and web interface. (default ":9559")
   -web.telemetry-path string
-        Path under which to expose metrics. (default "/metrics")
+     Path under which to expose metrics. (default "/metrics")
 ```
