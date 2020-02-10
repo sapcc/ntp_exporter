@@ -1,3 +1,9 @@
+# v1.1.1 (2020-02-10)
+
+Changes:
+
+- Update all dependencies to their current versions.
+
 # v1.1.0 (2019-11-19)
 
 New features:
