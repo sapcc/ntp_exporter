@@ -56,3 +56,19 @@ For example:
 ```sh
 $ curl 'http://localhost:9559/metrics?server=ntp.example.com&protocol=4&duration=10s'
 ```
+
+## Frequently asked questions (FAQ)
+
+### Is there a metric for checking that the exporter is working?
+
+Several people have suggested adding a metric like `ntp_up` that's always 1, so
+that people can alert on `absent(ntp_up)` or something like that. This is not
+necessary. [Prometheus already generates such a metric by itself during
+scraping.](https://prometheus.io/docs/concepts/jobs_instances/) A suitable
+alert expression could look like
+
+```
+up{job="ntp_exporter",instance="example.com:9559"} != 1 or absent(up{job="ntp_exporter",instance="example.com:9559"})
+```
+
+but the concrete labels will vary depending on your setup and scrape configuration.
