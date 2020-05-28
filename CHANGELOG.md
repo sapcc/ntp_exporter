@@ -1,3 +1,9 @@
+# v1.1.3 (TBD)
+
+Changes:
+
+- Update all dependencies to their current versions.
+
 # v1.1.2 (2020-04-08)
 
 Changes:
