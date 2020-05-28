@@ -16,7 +16,7 @@ We also publish pre-built images on Docker Hub as
 [sapcc/ntp-exporter](https://hub.docker.com/r/sapcc/ntp-exporter):
 
 ```bash
-docker pull sapcc/ntp-exporter:v1.1.2
+docker pull sapcc/ntp-exporter:v1.1.3
 ```
 
 ## Usage
