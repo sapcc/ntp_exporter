@@ -30,9 +30,9 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-func CollectorInitial(server string, protocol int, duration time.Duration) Collector {
+func CollectorInitial(target string, protocol int, duration time.Duration) Collector {
 	return Collector{
-		NtpServer:              server,
+		NtpServer:              target,
 		NtpProtocolVersion:     protocol,
 		NtpMeasurementDuration: duration,
 		drift: prometheus.NewGaugeVec(prometheus.GaugeOpts{
