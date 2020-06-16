@@ -1,3 +1,11 @@
+# v2.0.0 (TBD)
+
+**Backwards-incompatible changes:**
+
+- With `-ntp.source http`, the query parameter containing the NTP server has
+  been renamed from `source` to `target`. With this change, you can use the
+  [multi-target exporter pattern](https://prometheus.io/docs/guides/multi-target-exporter/).
+
 # v1.1.3 (2020-05-28)
 
 Changes:
