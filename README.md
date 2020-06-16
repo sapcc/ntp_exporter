@@ -54,14 +54,14 @@ When the option `-ntp.source http` is specified, the NTP server and connection
 options are obtained from the query parameters on each `GET /metrics` HTTP
 request:
 
-- `server`: NTP server to use
+- `target`: NTP server to use
 - `protocol`: NTP protocol version (2, 3 or 4)
 - `duration`: duration of measurements in case of high drift
 
 For example:
 
 ```sh
-$ curl 'http://localhost:9559/metrics?server=ntp.example.com&protocol=4&duration=10s'
+$ curl 'http://localhost:9559/metrics?target=ntp.example.com&protocol=4&duration=10s'
 ```
 
 ## Frequently asked questions (FAQ)
