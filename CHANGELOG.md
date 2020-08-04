@@ -1,4 +1,4 @@
-# v2.0.0 (TBD)
+# v2.0.0 (2020-08-04)
 
 **Backwards-incompatible changes:**
 
