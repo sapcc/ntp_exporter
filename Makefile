@@ -1,25 +1,18 @@
-PKG    = github.com/sapcc/ntp_exporter
 PREFIX = /usr
 
 all: build/ntp_exporter
 
-# NOTE: This repo uses Go modules, and uses a synthetic GOPATH at
-# $(CURDIR)/.gopath that is only used for the build cache. $GOPATH/src/ is
-# empty.
-GO            = GOPATH=$(CURDIR)/.gopath GOBIN=$(CURDIR)/build go
-GO_BUILDFLAGS =
-GO_LDFLAGS    = -s -w
+GO_BUILDFLAGS = -mod vendor
+GO_LDFLAGS    = -s -w -X main.version=$(shell ./util/find_version.sh)
 
-VERSION ?= $(shell sh util/find_version.sh)
+build/ntp_exporter: FORCE
+	go build $(GO_BUILDFLAGS) -ldflags '-s -w $(GO_LDFLAGS)' -o $@ .
 
-build/ntp_exporter: *.go
-	$(GO) install $(GO_BUILDFLAGS) -ldflags "$(GO_LDFLAGS) -X main.version=$(VERSION)" '$(PKG)'
-
-install: build/ntp_exporter
+install: build/ntp_exporter FORCE
 	install -D -m 0755 build/ntp_exporter "$(DESTDIR)$(PREFIX)/bin/ntp_exporter"
 
-vendor:
-	$(GO) mod tidy
-	$(GO) mod vendor
+vendor: FORCE
+	go mod tidy
+	go mod vendor
 
-.PHONY: install vendor
+.PHONY: FORCE
