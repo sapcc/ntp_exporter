@@ -1,6 +1,6 @@
 module github.com/sapcc/ntp_exporter
 
-go 1.14
+go 1.15
 
 require (
 	github.com/beevik/ntp v0.3.0
