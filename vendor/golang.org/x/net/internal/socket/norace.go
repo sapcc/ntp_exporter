@@ -2,10 +2,11 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// +build darwin,arm64,!go1.12
+// +build !race
 
-package unix
+package socket
 
-func Getdirentries(fd int, buf []byte, basep *uintptr) (n int, err error) {
-	return 0, ENOSYS
+func (m *Message) raceRead() {
+}
+func (m *Message) raceWrite() {
 }
