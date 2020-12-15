@@ -3,7 +3,7 @@ PREFIX = /usr
 all: build/ntp_exporter
 
 GO_BUILDFLAGS = -mod vendor
-GO_LDFLAGS    = -s -w -X main.version=$(shell ./util/find_version.sh)
+GO_LDFLAGS    = -X main.version=$(shell ./util/find_version.sh)
 
 build/ntp_exporter: FORCE
 	go build $(GO_BUILDFLAGS) -ldflags '-s -w $(GO_LDFLAGS)' -o $@ .
