@@ -1,7 +1,9 @@
 # ntp\_exporter
 
 This is a Prometheus exporter that, when running on a node, checks the drift
-of that node's clock against a given NTP server.
+of that node's clock against a given NTP server or servers.
+
+As an alternative to [the node-exporter's `time` module](https://github.com/prometheus/node_exporter/blob/master/docs/TIME.md), this exporter does not require an NTP component on localhost that it can talk to. We only look at the system clock and talk to the configured NTP server(s).
 
 ## Installation
 
