@@ -6,7 +6,7 @@ RUN make -C /src install PREFIX=/pkg GO_BUILDFLAGS='-mod vendor'
 
 ################################################################################
 
-FROM alpine:3.12
+FROM alpine:3.13
 MAINTAINER "Stefan Majewsky <stefan.majewsky@sap.com>"
 LABEL source_repository="https://github.com/sapcc/ntp_exporter"
 
