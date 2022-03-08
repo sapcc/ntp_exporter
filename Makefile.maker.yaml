@@ -22,6 +22,7 @@ githubWorkflows:
     enabled: true
   spellCheck:
     enabled: true
+    ignoreWords: ["strat"]
     ignorePaths: [] # override global setting so that nothing is ignored
 
 golangciLint:

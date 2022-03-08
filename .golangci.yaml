@@ -39,6 +39,9 @@ linters-settings:
   govet:
     # Report about shadowed variables.
     check-shadowing: true
+  misspell:
+    ignore-words:
+      - strat
   whitespace:
     # Enforce newlines (or comments) after multi-line function signatures.
     multi-func: true
