@@ -101,7 +101,8 @@ func (c Collector) measure() error {
 
 		log.Printf("WARN: clock drift is above %.2fs, taking multiple measurements for %.2f seconds", highDrift, c.NtpMeasurementDuration.Seconds())
 		for time.Since(begin) < c.NtpMeasurementDuration {
-			clockOffset, stratum, err := c.getClockOffsetAndStratum()
+			var stratum float64
+			clockOffset, stratum, err = c.getClockOffsetAndStratum()
 
 			if err != nil {
 				return fmt.Errorf("couldn't get NTP drift: %s", err)
