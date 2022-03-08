@@ -110,7 +110,6 @@ func (c Collector) measure() error {
 
 			measurementsClockOffset = append(measurementsClockOffset, clockOffset)
 			measurementsStratum = append(measurementsStratum, stratum)
-
 		}
 
 		clockOffset = calculateMedian(measurementsClockOffset)
@@ -136,7 +135,6 @@ func (c Collector) getClockOffsetAndStratum() (clockOffset float64, strat float6
 }
 
 func calculateMedian(slice []float64) (median float64) {
-
 	sort.Float64s(slice)
 
 	middle := len(slice) / 2
