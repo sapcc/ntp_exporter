@@ -88,7 +88,7 @@ func (c Collector) measure() error {
 	const highDrift = 0.01
 
 	begin := time.Now()
-	clockOffset, strat, err := c.getClockOffsetAndStratum()
+	clockOffset, stratum, err := c.getClockOffsetAndStratum()
 
 	if err != nil {
 		return fmt.Errorf("couldn't get NTP drift: %s", err)
@@ -101,23 +101,21 @@ func (c Collector) measure() error {
 
 		log.Printf("WARN: clock drift is above %.2fs, taking multiple measurements for %.2f seconds", highDrift, c.NtpMeasurementDuration.Seconds())
 		for time.Since(begin) < c.NtpMeasurementDuration {
-			var stratum float64
-			clockOffset, stratum, err = c.getClockOffsetAndStratum()
-
+			nextClockOffset, nextStratum, err := c.getClockOffsetAndStratum()
 			if err != nil {
 				return fmt.Errorf("couldn't get NTP drift: %s", err)
 			}
 
-			measurementsClockOffset = append(measurementsClockOffset, clockOffset)
-			measurementsStratum = append(measurementsStratum, stratum)
+			measurementsClockOffset = append(measurementsClockOffset, nextClockOffset)
+			measurementsStratum = append(measurementsStratum, nextStratum)
 		}
 
 		clockOffset = calculateMedian(measurementsClockOffset)
-		strat = calculateMedian(measurementsStratum)
+		stratum = calculateMedian(measurementsStratum)
 	}
 
 	c.drift.WithLabelValues(c.NtpServer).Set(clockOffset)
-	c.stratum.Set(strat)
+	c.stratum.Set(stratum)
 
 	c.scrapeDuration.Observe(time.Since(begin).Seconds())
 	return nil
