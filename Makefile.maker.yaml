@@ -1,0 +1,29 @@
+# Configuration file for <https://github.com/sapcc/go-makefile-maker>
+
+binaries:
+  - name: ntp_exporter
+    fromPackage: .
+    installTo: bin/
+
+variables:
+  GO_LDFLAGS: "-X main.version=$(shell ./util/find_version.sh)"
+
+vendoring:
+  enabled: true
+
+githubWorkflows:
+  global:
+    ignorePaths: [ "**.md" ] # all Markdown files
+  ci:
+    # Even though there are no tests, we can still use the CI workflow for linting and
+    # successful build compilation.
+    enabled: true
+  license:
+    enabled: true
+  spellCheck:
+    enabled: true
+    ignoreWords: ["strat"]
+    ignorePaths: [] # override global setting so that nothing is ignored
+
+golangciLint:
+  createConfig: true

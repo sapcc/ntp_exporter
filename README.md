@@ -1,5 +1,7 @@
 # ntp\_exporter
 
+[![CI](https://github.com/sapcc/ntp_exporter/actions/workflows/ci.yaml/badge.svg)](https://github.com/sapcc/ntp_exporter/actions/workflows/ci.yaml)
+
 This is a Prometheus exporter that, when running on a node, checks the drift
 of that node's clock against a given NTP server or servers.
 

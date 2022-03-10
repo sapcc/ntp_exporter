@@ -127,6 +127,7 @@ func handlerMetrics(w http.ResponseWriter, r *http.Request) {
 }
 
 func handlerDefault(w http.ResponseWriter, r *http.Request) {
+	//nolint:errcheck
 	w.Write([]byte(`<html>
 			<head><title>NTP Exporter</title></head>
 			<body>
