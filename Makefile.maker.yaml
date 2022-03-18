@@ -11,6 +11,12 @@ variables:
 vendoring:
   enabled: true
 
+golangciLint:
+  createConfig: true
+
+spellCheck:
+  ignoreWords: ["strat"]
+
 githubWorkflow:
   global:
     ignorePaths: [ "**.md" ] # all Markdown files
@@ -18,12 +24,10 @@ githubWorkflow:
     # Even though there are no tests, we can still use the CI workflow for linting and
     # successful build compilation.
     enabled: true
+  codeQL:
+    enabled: true
   license:
     enabled: true
   spellCheck:
     enabled: true
-    ignoreWords: ["strat"]
     ignorePaths: [] # override global setting so that nothing is ignored
-
-golangciLint:
-  createConfig: true
