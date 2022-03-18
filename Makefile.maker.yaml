@@ -11,7 +11,7 @@ variables:
 vendoring:
   enabled: true
 
-githubWorkflows:
+githubWorkflow:
   global:
     ignorePaths: [ "**.md" ] # all Markdown files
   ci:
