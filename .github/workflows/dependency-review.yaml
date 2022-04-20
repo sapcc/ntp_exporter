@@ -3,32 +3,19 @@
 # Edit Makefile.maker.yaml instead.                                            #
 ################################################################################
 
-name: License
+name: Dependency Review
 "on":
-  push:
-    branches:
-      - master
-    paths-ignore:
-      - '**.md'
   pull_request:
     branches:
       - '*'
-    paths-ignore:
-      - '**.md'
 permissions:
   contents: read
 jobs:
-  addlicense:
-    name: Check
+  review:
+    name: Review
     runs-on: ubuntu-latest
     steps:
       - name: Check out code
         uses: actions/checkout@v3
-      - name: Set up Go
-        uses: actions/setup-go@v3
-        with:
-          go-version: "1.17"
-      - name: Check if source code files have license header
-        run: |
-          go install github.com/google/addlicense@latest
-          find * \( -name vendor -type d -prune \) -o \( -name \*.go -exec addlicense --check -- {} + \)
+      - name: Dependency Review
+        uses: actions/dependency-review-action@v1
