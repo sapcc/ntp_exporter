@@ -13,14 +13,14 @@ Compile `make && make install` or `docker build`. The binary can also be
 installed with `go get`:
 
 ```bash
-go get github.com/sapcc/ntp_exporter
+go install github.com/sapcc/ntp_exporter@latest
 ```
 
 We also publish pre-built images on Docker Hub as
 [sapcc/ntp-exporter](https://hub.docker.com/r/sapcc/ntp-exporter):
 
 ```bash
-docker pull sapcc/ntp-exporter:v2.0.1
+docker pull sapcc/ntp-exporter:v2.0.2
 ```
 
 ## Usage

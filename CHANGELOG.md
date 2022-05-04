@@ -1,3 +1,9 @@
+# v2.0.2 (2022-05-04)
+
+Changes:
+
+- Update all dependencies to their current versions.
+
 # v2.0.1 (2021-09-24)
 
 Changes:
