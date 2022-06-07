@@ -1,5 +1,8 @@
 # Configuration file for <https://github.com/sapcc/go-makefile-maker>
 
+metadata:
+  url: https://github.com/sapcc/ntp_exporter
+
 binaries:
   - name: ntp_exporter
     fromPackage: .
@@ -10,6 +13,11 @@ variables:
 
 vendoring:
   enabled: true
+
+dockerfile:
+  enabled: true
+  extraIgnores:
+    - "dist/"
 
 golangciLint:
   createConfig: true
