@@ -41,6 +41,12 @@
         "action"
       ],
       "enabled": false
+    },
+    {
+      "matchDepTypes": [
+        "dockerfile"
+      ],
+      "enabled": false
     }
   ],
   "prHourlyLimit": 0,
