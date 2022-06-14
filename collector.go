@@ -189,7 +189,7 @@ func (c Collector) measure() error {
 			measurementsReferenceTime = append(measurementsReferenceTime, nextMeasurement.referenceTime)
 			measurementsRootDelay = append(measurementsRootDelay, nextMeasurement.rootDelay)
 			measurementsRootDispersion = append(measurementsRootDispersion, nextMeasurement.rootDispersion)
-			measurementsRootDistance = append(measurementsRootDispersion, nextMeasurement.rootDistance)
+			measurementsRootDistance = append(measurementsRootDistance, nextMeasurement.rootDistance)
 			measurementsPrecision = append(measurementsPrecision, nextMeasurement.precision)
 			measurementsLeap = append(measurementsLeap, nextMeasurement.leap)
 		}
