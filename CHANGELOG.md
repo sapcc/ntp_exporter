@@ -1,3 +1,10 @@
+# v2.1.0 (TBD)
+
+Changes:
+
+- New metrics were added: `ntp_rtt_seconds`, `ntp_reference_timestamp_seconds`, `ntp_root_delay_seconds`, `ntp_root_dispersion_seconds`, `ntp_root_distance_seconds`, `ntp_precision_seconds`, `ntp_leap`
+- The `ntp_stratum` metric now has the label `server`, and is reported separately for each server.
+
 # v2.0.2 (2022-05-04)
 
 Changes:
