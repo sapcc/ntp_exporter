@@ -8,9 +8,6 @@ binaries:
     fromPackage: .
     installTo: bin/
 
-variables:
-  GO_LDFLAGS: "-X main.version=$(shell ./util/find_version.sh)"
-
 vendoring:
   enabled: true
 

@@ -31,10 +31,10 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/sapcc/go-api-declarations/bininfo"
 )
 
 var (
-	version                string // will be substituted at compile-time
 	showVersion            bool
 	listenAddress          string
 	metricsPath            string
@@ -47,6 +47,7 @@ var (
 var logger = log.New(os.Stderr, "", log.LstdFlags)
 
 func main() {
+	version := bininfo.VersionOr("unknown")
 	if showVersion {
 		fmt.Println(version)
 		os.Exit(0)
