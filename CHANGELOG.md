@@ -4,6 +4,7 @@ Changes:
 
 - New metrics were added: `ntp_rtt_seconds`, `ntp_reference_timestamp_seconds`, `ntp_root_delay_seconds`, `ntp_root_dispersion_seconds`, `ntp_root_distance_seconds`, `ntp_precision_seconds`, `ntp_leap`
 - The `ntp_stratum` metric now has the label `server`, and is reported separately for each server.
+- Go got updated to version 1.18.
 
 # v2.0.2 (2022-05-04)
 
