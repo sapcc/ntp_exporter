@@ -7,6 +7,7 @@ of that node's clock against a given NTP server or servers.
 
 These are the metrics supported.
 
+- `ntp_build_info`
 - `ntp_drift_seconds`
 - `ntp_stratum`
 - `ntp_rtt_seconds`

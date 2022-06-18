@@ -35,6 +35,12 @@ func CollectorInitial(target string, protocol int, duration time.Duration) Colle
 		NtpServer:              target,
 		NtpProtocolVersion:     protocol,
 		NtpMeasurementDuration: duration,
+		buildInfo: prometheus.NewGaugeFunc(prometheus.GaugeOpts{
+			Namespace:   "ntp",
+			Name:        "build_info",
+			Help:        "ntp_exporter version.",
+			ConstLabels: prometheus.Labels{"version": version, "revision": revision, "build_date": buildDate},
+		}, func() float64 { return 1 }),
 		drift: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: "ntp",
 			Name:      "drift_seconds",
@@ -93,6 +99,7 @@ type Collector struct {
 	NtpServer              string
 	NtpProtocolVersion     int
 	NtpMeasurementDuration time.Duration
+	buildInfo              prometheus.GaugeFunc
 	stratum                *prometheus.GaugeVec
 	drift                  *prometheus.GaugeVec
 	rtt                    *prometheus.GaugeVec
@@ -120,6 +127,7 @@ type Measurement struct {
 
 //Describe implements the prometheus.Collector interface.
 func (c Collector) Describe(ch chan<- *prometheus.Desc) {
+	c.buildInfo.Describe(ch)
 	c.drift.Describe(ch)
 	c.stratum.Describe(ch)
 	c.rtt.Describe(ch)
@@ -137,6 +145,7 @@ func (c Collector) Collect(ch chan<- prometheus.Metric) {
 	err := c.measure()
 	//only report data when measurement was successful
 	if err == nil {
+		c.buildInfo.Collect(ch)
 		c.drift.Collect(ch)
 		c.stratum.Collect(ch)
 		c.rtt.Collect(ch)

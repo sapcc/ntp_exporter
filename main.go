@@ -46,8 +46,11 @@ var (
 
 var logger = log.New(os.Stderr, "", log.LstdFlags)
 
+var version = bininfo.VersionOr("unknown")
+var buildDate = bininfo.BuildDateOr("unknown")
+var revision = bininfo.CommitOr("unknown")
+
 func main() {
-	version := bininfo.VersionOr("unknown")
 	if showVersion {
 		fmt.Println(version)
 		os.Exit(0)
@@ -134,6 +137,9 @@ func handlerDefault(w http.ResponseWriter, r *http.Request) {
 			<body>
 			<h1>NTP Exporter</h1>
 			<p><a href="` + metricsPath + `">Metrics</a></p>
+			<p>Version: ` + version + `</p>
+			<p>Revision: ` + revision + `</p>
+			<p>Build date: ` + buildDate + `</p>
 			</body>
 			</html>`))
 }
