@@ -1,3 +1,9 @@
+# v2.2.0 (TBD)
+
+Changes:
+
+- Add `ntp_build_info` metric.
+
 # v2.1.0 (2022-06-17)
 
 Changes:
