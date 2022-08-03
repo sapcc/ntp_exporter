@@ -94,7 +94,7 @@ func CollectorInitial(target string, protocol int, duration time.Duration) Colle
 	}
 }
 
-//Collector implements the prometheus.Collector interface.
+// Collector implements the prometheus.Collector interface.
 type Collector struct {
 	NtpServer              string
 	NtpProtocolVersion     int
@@ -112,7 +112,7 @@ type Collector struct {
 	scrapeDuration         prometheus.Summary
 }
 
-//A single measurement returned by ntp server
+// A single measurement returned by ntp server
 type Measurement struct {
 	clockOffset    float64
 	stratum        float64
@@ -125,7 +125,7 @@ type Measurement struct {
 	leap           float64
 }
 
-//Describe implements the prometheus.Collector interface.
+// Describe implements the prometheus.Collector interface.
 func (c Collector) Describe(ch chan<- *prometheus.Desc) {
 	c.buildInfo.Describe(ch)
 	c.drift.Describe(ch)
@@ -140,7 +140,7 @@ func (c Collector) Describe(ch chan<- *prometheus.Desc) {
 	c.scrapeDuration.Describe(ch)
 }
 
-//Collect implements the prometheus.Collector interface.
+// Collect implements the prometheus.Collector interface.
 func (c Collector) Collect(ch chan<- prometheus.Metric) {
 	err := c.measure()
 	//only report data when measurement was successful
