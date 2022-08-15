@@ -37,7 +37,8 @@ else
 endif
 
 install: FORCE build/ntp_exporter
-	install -D -m 0755 build/ntp_exporter "$(DESTDIR)$(PREFIX)/bin/ntp_exporter"
+	install -d -m 0755 "$(DESTDIR)$(PREFIX)/bin"
+	install -m 0755 build/ntp_exporter "$(DESTDIR)$(PREFIX)/bin/ntp_exporter"
 
 # which packages to test with "go test"
 GO_TESTPKGS := $(shell go list -f '{{if or .TestGoFiles .XTestGoFiles}}{{.ImportPath}}{{end}}' ./...)
