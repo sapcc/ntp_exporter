@@ -67,6 +67,9 @@ linters-settings:
     local-prefixes: github.com/sapcc/ntp_exporter
   gosec:
     excludes:
+      # gosec wants us to set a short ReadHeaderTimeout to avoid Slowloris attacks, but doing so would expose us to Keep-Alive race conditions (see https://iximiuz.com/en/posts/reverse-proxy-http-keep-alive-and-502s/)
+      - G112
+      # created file permissions are restricted by umask if necessary
       - G306
   govet:
     # Report about shadowed variables.
@@ -94,7 +97,6 @@ linters:
   disable-all: true
   enable:
     - bodyclose
-    - deadcode
     - dupl
     - errcheck
     - exportloopref
@@ -111,12 +113,10 @@ linters:
     - rowserrcheck
     - sqlclosecheck
     - staticcheck
-    - structcheck
     - stylecheck
     - typecheck
     - unconvert
     - unparam
     - unused
     - usestdlibvars
-    - varcheck
     - whitespace
