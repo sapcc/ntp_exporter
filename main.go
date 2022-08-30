@@ -72,7 +72,7 @@ func main() {
 	http.HandleFunc("/", handlerDefault)
 
 	logger.Println("listening on", listenAddress)
-	err := http.ListenAndServe(listenAddress, nil)
+	err := http.ListenAndServe(listenAddress, nil) //nolint: gosec // no timeout is required
 	if err != nil {
 		log.Fatal(err)
 	}
