@@ -33,12 +33,6 @@
         "dockerfile"
       ],
       "enabled": false
-    },
-    {
-      "matchPackagePrefixes": [
-        "github.com/sapcc/go-api-declarations"
-      ],
-      "automerge": true
     }
   ],
   "prHourlyLimit": 0,
