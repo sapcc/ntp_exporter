@@ -36,13 +36,6 @@
         ".*"
       ],
       "groupName": "External dependencies"
-    },
-    {
-      "matchDepTypes": [
-        "action",
-        "dockerfile"
-      ],
-      "enabled": false
     }
   ],
   "prHourlyLimit": 0,
