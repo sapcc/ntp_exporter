@@ -8,9 +8,6 @@ binaries:
     fromPackage: .
     installTo: bin/
 
-vendoring:
-  enabled: true
-
 dockerfile:
   enabled: true
   extraIgnores:
@@ -24,9 +21,6 @@ spellCheck:
 
 githubWorkflow:
   global:
-    assignees:
-      - majewsky
-      - SuperSandro2000
     ignorePaths: [ "**.md" ] # all Markdown files
   ci:
     # Even though there are no tests, we can still use the CI workflow for linting and
@@ -43,4 +37,10 @@ githubWorkflow:
     ignorePaths: [] # override global setting so that nothing is ignored
 
 renovate:
+  enabled: true
+  assignees:
+    - majewsky
+    - SuperSandro2000
+
+vendoring:
   enabled: true
