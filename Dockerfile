@@ -23,5 +23,5 @@ LABEL source_repository="https://github.com/sapcc/ntp_exporter" \
   org.opencontainers.image.version=${BININFO_VERSION}
 
 USER 4200:4200
-WORKDIR /var/empty
+WORKDIR /home/appuser
 ENTRYPOINT [ "/usr/bin/ntp_exporter" ]
