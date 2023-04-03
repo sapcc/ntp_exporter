@@ -2,6 +2,7 @@
   "extends": [
     "config:base",
     "default:pinDigestsDisabled",
+    "github>whitesource/merge-confidence:beta",
     "docker:disable"
   ],
   "assignees": [
