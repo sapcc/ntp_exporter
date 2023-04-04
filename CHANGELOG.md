@@ -1,8 +1,10 @@
-# v2.2.0 (TBD)
+# v2.2.0 (2023-04-04)
 
 Changes:
 
 - Add `ntp_build_info` metric.
+- Golang was updated to version 1.20.
+- Update all dependencies to their current versions.
 
 # v2.1.0 (2022-06-17)
 
