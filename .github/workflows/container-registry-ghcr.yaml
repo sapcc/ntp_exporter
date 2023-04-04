@@ -31,7 +31,13 @@ jobs:
         uses: docker/metadata-action@v4
         with:
           images: ghcr.io/${{ github.repository }}
-          tags: type=raw,value=latest,enable={{is_default_branch}}
+          tags: |-
+            # https://github.com/docker/metadata-action#latest-tag
+            type=raw,value=latest,enable={{is_default_branch}}
+            # https://github.com/docker/metadata-action#typesemver
+            type=semver,pattern={{raw}}
+            type=semver,pattern=v{{major}}.{{minor}}
+            type=semver,pattern=v{{major}}
       - name: Build and push Docker image
         uses: docker/build-push-action@v4
         with:
