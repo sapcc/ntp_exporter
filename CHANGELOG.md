@@ -1,3 +1,9 @@
+# v2.3.0 (TBD)
+
+Changes:
+
+- The container image moved from Docker Hub to ghcr.io and can now be found under ``ghcr.io/sapcc/ntp_exporter:vX.X.X``
+
 # v2.2.0 (2023-04-04)
 
 Changes:
