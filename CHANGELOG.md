@@ -1,8 +1,14 @@
-# v2.3.0 (TBD)
+# v2.4.0 (TBD)
+
+Changes:
+
+# v2.3.0 (2023-06-14)
 
 Changes:
 
 - The container image moved from Docker Hub to ghcr.io and can now be found under ``ghcr.io/sapcc/ntp_exporter:vX.X.X``
+- Add automaxprocs
+- Update all dependencies to their current versions.
 
 # v2.2.0 (2023-04-04)
 
