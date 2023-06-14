@@ -1,4 +1,4 @@
-// Copyright 2015-2017 Brett Vickers.
+// Copyright 2015-2023 Brett Vickers.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
@@ -16,6 +16,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"strconv"
 	"time"
 
 	"golang.org/x/net/ipv4"
@@ -159,26 +160,36 @@ func (m *msg) getLeap() LeapIndicator {
 	return LeapIndicator((m.LiVnMode >> 6) & 0x03)
 }
 
-// QueryOptions contains the list of configurable options that may be used
-// with the QueryWithOptions function.
+// dialFn is a function used to override the QueryWithOptions function's
+// default network "dialing" behavior. It creates a connection to a remote
+// network endpoint (raddr + rport) from a local network endpoint (laddr +
+// lport). The local address 'laddr' comes from the 'LocalAddress' specified
+// in QueryOptions. The local port 'lport' is always zero. The remote address
+// 'raddr' comes from the QueryWithOptions host parameter. The remote port
+// 'rport' comes from the 'Port' specified in QueryOptions.
+type dialFn func(laddr string, lport int, raddr string, rport int) (net.Conn, error)
+
+// QueryOptions contains configurable options used by the QueryWithOptions
+// function.
 type QueryOptions struct {
-	Timeout      time.Duration // defaults to 5 seconds
+	Timeout      time.Duration // connection timeout, defaults to 5 seconds
 	Version      int           // NTP protocol version, defaults to 4
-	LocalAddress string        // IP address to use for the client address
-	Port         int           // Server port, defaults to 123
+	LocalAddress string        // address to use for the local system
+	Port         int           // remote server port, defaults to 123
 	TTL          int           // IP TTL to use, defaults to system default
+	Dial         dialFn        // overrides the default UDP dialer
 }
 
 // A Response contains time data, some of which is returned by the NTP server
-// and some of which is calculated by the client.
+// and some of which is calculated by this client.
 type Response struct {
 	// Time is the transmit time reported by the server just before it
 	// responded to the client's NTP query.
 	Time time.Time
 
-	// ClockOffset is the estimated offset of the client clock relative to
-	// the server. Add this to the client's system clock time to obtain a
-	// more accurate time.
+	// ClockOffset is the estimated offset of the local system clock relative
+	// to the server's clock. Add this value to subsequent local system time
+	// measurements in order to obtain a more accurate time.
 	ClockOffset time.Duration
 
 	// RTT is the measured round-trip-time delay estimate between the client
@@ -280,9 +291,9 @@ func (r *Response) Validate() error {
 	return nil
 }
 
-// Query returns a response from the remote NTP server host. It contains
-// the time at which the server transmitted the response as well as other
-// useful information about the time and the remote server.
+// Query returns a response from the remote NTP server at address 'host'. The
+// response contains the time at which the server responded to the query as
+// well as other useful information about the time and the remote server.
 func Query(host string) (*Response, error) {
 	return QueryWithOptions(host, QueryOptions{})
 }
@@ -297,9 +308,9 @@ func QueryWithOptions(host string, opt QueryOptions) (*Response, error) {
 	return parseTime(m, now), nil
 }
 
-// Time returns the current time using information from a remote NTP server.
-// It uses version 4 of the NTP protocol. On error, it returns the local
-// system time.
+// Time returns the current local time using information returned from the
+// remote NTP server at address 'host'. It uses version 4 of the NTP protocol.
+// On error, it returns the local system time.
 func Time(host string) (time.Time, error) {
 	r, err := Query(host)
 	if err != nil {
@@ -318,35 +329,24 @@ func Time(host string) (time.Time, error) {
 // getTime performs the NTP server query and returns the response message
 // along with the local system time it was received.
 func getTime(host string, opt QueryOptions) (*msg, ntpTime, error) {
+	if opt.Timeout == 0 {
+		opt.Timeout = defaultTimeout
+	}
 	if opt.Version == 0 {
 		opt.Version = defaultNtpVersion
 	}
 	if opt.Version < 2 || opt.Version > 4 {
 		return nil, 0, errors.New("invalid protocol version requested")
 	}
-
-	// Resolve the remote NTP server address.
-	raddr, err := net.ResolveUDPAddr("udp", net.JoinHostPort(host, "123"))
-	if err != nil {
-		return nil, 0, err
+	if opt.Port == 0 {
+		opt.Port = 123
+	}
+	if opt.Dial == nil {
+		opt.Dial = defaultDial
 	}
 
-	// Resolve the local address if specified as an option.
-	var laddr *net.UDPAddr
-	if opt.LocalAddress != "" {
-		laddr, err = net.ResolveUDPAddr("udp", net.JoinHostPort(opt.LocalAddress, "0"))
-		if err != nil {
-			return nil, 0, err
-		}
-	}
-
-	// Override the port if requested.
-	if opt.Port != 0 {
-		raddr.Port = opt.Port
-	}
-
-	// Prepare a "connection" to the remote server.
-	con, err := net.DialUDP("udp", laddr, raddr)
+	// Connect to the remote server.
+	con, err := opt.Dial(opt.LocalAddress, 0, host, opt.Port)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -362,9 +362,6 @@ func getTime(host string, opt QueryOptions) (*msg, ntpTime, error) {
 	}
 
 	// Set a timeout on the connection.
-	if opt.Timeout == 0 {
-		opt.Timeout = defaultTimeout
-	}
 	con.SetDeadline(time.Now().Add(opt.Timeout))
 
 	// Allocate a message to hold the response.
@@ -403,16 +400,10 @@ func getTime(host string, opt QueryOptions) (*msg, ntpTime, error) {
 		return nil, 0, err
 	}
 
-	// Keep track of the time the response was received.
+	// Keep track of the time the response was received. As of go 1.9,
+	// time.Since assumes a monotonic clock, so delta cannot be less than
+	// zero.
 	delta := time.Since(xmitTime)
-	if delta < 0 {
-		// The local system may have had its clock adjusted since it
-		// sent the query. In go 1.9 and later, time.Since ensures
-		// that a monotonic clock is used, so delta can never be less
-		// than zero. In versions before 1.9, a monotonic clock is
-		// not used, so we have to check.
-		return nil, 0, errors.New("client clock ticked backwards")
-	}
 	recvTime := toNtpTime(xmitTime.Add(delta))
 
 	// Check for invalid fields.
@@ -434,6 +425,26 @@ func getTime(host string, opt QueryOptions) (*msg, ntpTime, error) {
 	recvMsg.OriginTime = toNtpTime(xmitTime)
 
 	return recvMsg, recvTime, nil
+}
+
+// defaultDial provides a UDP dialer based on Go's built-in net stack.
+func defaultDial(localAddr string, localPort int, remoteAddr string, remotePort int) (net.Conn, error) {
+	rhostport := net.JoinHostPort(remoteAddr, strconv.Itoa(remotePort))
+	raddr, err := net.ResolveUDPAddr("udp", rhostport)
+	if err != nil {
+		return nil, err
+	}
+
+	var laddr *net.UDPAddr
+	if localAddr != "" {
+		lhostport := net.JoinHostPort(localAddr, strconv.Itoa(localPort))
+		laddr, err = net.ResolveUDPAddr("udp", lhostport)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return net.DialUDP("udp", laddr, raddr)
 }
 
 // parseTime parses the NTP packet along with the packet receive time to
