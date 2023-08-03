@@ -169,7 +169,7 @@ func (c Collector) measure() error {
 	measurement, err := c.getClockOffsetAndStratum()
 
 	if err != nil {
-		return fmt.Errorf("couldn't get NTP measurement: %s", err)
+		return fmt.Errorf("couldn't get NTP measurement: %w", err)
 	}
 
 	//if clock drift is unusually high (e.g. >10ms): repeat measurements for 30 seconds and submit median value
@@ -189,7 +189,7 @@ func (c Collector) measure() error {
 		for time.Since(begin) < c.NtpMeasurementDuration {
 			nextMeasurement, err := c.getClockOffsetAndStratum()
 			if err != nil {
-				return fmt.Errorf("couldn't get NTP measurement: %s", err)
+				return fmt.Errorf("couldn't get NTP measurement: %w", err)
 			}
 
 			measurementsClockOffset = append(measurementsClockOffset, nextMeasurement.clockOffset)
@@ -232,7 +232,7 @@ func (c Collector) getClockOffsetAndStratum() (measurement Measurement, err erro
 	options := ntp.QueryOptions{Version: c.NtpProtocolVersion}
 	resp, err := ntp.QueryWithOptions(c.NtpServer, options)
 	if err != nil {
-		return measurement, fmt.Errorf("couldn't get NTP measurement: %s", err)
+		return measurement, fmt.Errorf("couldn't get NTP measurement: %w", err)
 	}
 	measurement.clockOffset = resp.ClockOffset.Seconds()
 	measurement.stratum = float64(resp.Stratum)
