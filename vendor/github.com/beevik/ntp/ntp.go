@@ -15,6 +15,7 @@ import (
 	"crypto/rand"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"net"
 	"strconv"
 	"strings"
@@ -209,11 +210,6 @@ type QueryOptions struct {
 	// a port number.
 	LocalAddress string
 
-	// Port indicates the port used to reach the remote NTP server.
-	//
-	// DEPRECATED. Embed the port number in the query address string instead.
-	Port int
-
 	// TTL specifies the maximum number of IP hops before the query datagram
 	// is dropped by the network. Defaults to the local system's default value.
 	TTL int
@@ -238,6 +234,11 @@ type QueryOptions struct {
 	//
 	// DEPRECATED. Use Dialer instead.
 	Dial func(laddr string, lport int, raddr string, rport int) (net.Conn, error)
+
+	// Port indicates the port used to reach the remote NTP server.
+	//
+	// DEPRECATED. Embed the port number in the query address string instead.
+	Port int
 }
 
 // A Response contains time data, some of which is returned by the NTP server
@@ -267,13 +268,13 @@ type Response struct {
 	// issues too many requests to the server in a short period of time.
 	Stratum uint8
 
-	// ReferenceID is a 32-bit identifier identifying the server or reference
+	// ReferenceID is a 32-bit integer identifying the server or reference
 	// clock. For stratum 1 servers, this is typically a meaningful
 	// zero-padded ASCII-encoded string assigned to the clock. For stratum 2+
 	// servers, this is a reference identifier for the server and is either
 	// the server's IPv4 address or a hash of its IPv6 address. For
-	// kiss-of-death responses (stratum=0), this field contains the
-	// ASCII-encoded "kiss code".
+	// kiss-of-death responses (stratum 0), this is the ASCII-encoded "kiss
+	// code".
 	ReferenceID uint32
 
 	// ReferenceTime is the time when the server's system clock was last
@@ -321,6 +322,40 @@ type Response struct {
 // response's KissCode value to determine the reason for the kiss of death.
 func (r *Response) IsKissOfDeath() bool {
 	return r.Stratum == 0
+}
+
+// ReferenceString returns the response's ReferenceID value formatted as a
+// string. If the response's stratum is zero, then the "kiss o' death" string
+// is returned. If stratum is one, then the server is a reference clock and
+// the reference clock's name is returned. If stratum is two or greater, then
+// the ID is either an IPv4 address or an MD5 hash of the IPv6 address; in
+// either case the reference string is reported as 4 dot-separated
+// decimal-based integers.
+func (r *Response) ReferenceString() string {
+	if r.Stratum == 0 {
+		return kissCode(r.ReferenceID)
+	}
+
+	var b [4]byte
+	binary.BigEndian.PutUint32(b[:], r.ReferenceID)
+
+	if r.Stratum == 1 {
+		const dot = rune(0x22c5)
+		var r []rune
+		for i := range b {
+			if b[i] == 0 {
+				break
+			}
+			if b[i] >= 32 && b[i] <= 126 {
+				r = append(r, rune(b[i]))
+			} else {
+				r = append(r, dot)
+			}
+		}
+		return fmt.Sprintf(".%s.", string(r))
+	}
+
+	return fmt.Sprintf("%d.%d.%d.%d", b[0], b[1], b[2], b[3])
 }
 
 // Validate checks if the response is valid for the purposes of time
@@ -371,18 +406,21 @@ func (r *Response) Validate() error {
 	return nil
 }
 
-// Query requests time data from a remote NTP server. The server address is of
-// the form "host", "host:port", "host%zone:port", "[host]:port" or
-// "[host%zone]:port". If no port is included, NTP default port 123 is used.
-// The response contains information from which an accurate local time can be
-// determined.
+// Query requests time data from a remote NTP server. The response contains
+// information from which a more accurate local time can be inferred.
+//
+// The server address is of the form "host", "host:port", "host%zone:port",
+// "[host]:port" or "[host%zone]:port". The host may contain an IPv4, IPv6 or
+// domain name address. When specifying both a port and an IPv6 address, one
+// of the bracket formats must be used. If no port is included, NTP default
+// port 123 is used.
 func Query(address string) (*Response, error) {
 	return QueryWithOptions(address, QueryOptions{})
 }
 
 // QueryWithOptions performs the same function as Query but allows for the
-// customization of certain query behaviors. See the comment for Query for
-// more information.
+// customization of certain query behaviors. See the comments for Query and
+// QueryOptions for further details.
 func QueryWithOptions(address string, opt QueryOptions) (*Response, error) {
 	h, now, err := getTime(address, &opt)
 	if err != nil && err != ErrAuthFailed {
@@ -392,11 +430,15 @@ func QueryWithOptions(address string, opt QueryOptions) (*Response, error) {
 	return generateResponse(h, now, err), nil
 }
 
-// Time returns the current local time using information returned from the
-// remote NTP server. The server address is of the form "host", "host:port",
-// "host%zone:port", "[host]:port" or "[host%zone]:port". If no port is
-// included, NTP default port 123 is used. On error, Time returns the local
+// Time returns the current, corrected local time using information returned
+// from the remote NTP server. On error, Time returns the uncorrected local
 // system time.
+//
+// The server address is of the form "host", "host:port", "host%zone:port",
+// "[host]:port" or "[host%zone]:port". The host may contain an IPv4, IPv6 or
+// domain name address. When specifying both a port and an IPv6 address, one
+// of the bracket formats must be used. If no port is included, NTP default
+// port 123 is used.
 func Time(address string) (time.Time, error) {
 	r, err := Query(address)
 	if err != nil {
@@ -437,16 +479,11 @@ func getTime(address string, opt *QueryOptions) (*header, ntpTime, error) {
 		opt.Dialer = defaultDialer
 	}
 
-	// Compose a remote "host:port" address string if the address string
-	// doesn't already contain a port.
-	remoteAddress := address
-	_, _, err := net.SplitHostPort(address)
+	// Compose a conforming host:port remote address string if the address
+	// string doesn't already contain a port.
+	remoteAddress, err := fixHostPort(address, opt.Port)
 	if err != nil {
-		if strings.Contains(err.Error(), "missing port") {
-			remoteAddress = net.JoinHostPort(address, strconv.Itoa(opt.Port))
-		} else {
-			return nil, 0, err
-		}
+		return nil, 0, err
 	}
 
 	// Connect to the remote server.
@@ -460,16 +497,6 @@ func getTime(address string, opt *QueryOptions) (*header, ntpTime, error) {
 	if opt.TTL != 0 {
 		ipcon := ipv4.NewConn(con)
 		err = ipcon.SetTTL(opt.TTL)
-		if err != nil {
-			return nil, 0, err
-		}
-	}
-
-	// If using symmetric key authentication, decode and validate the auth key
-	// string.
-	var decodedAuthKey []byte
-	if opt.Auth.Type != AuthNone {
-		decodedAuthKey, err = decodeAuthKey(opt.Auth)
 		if err != nil {
 			return nil, 0, err
 		}
@@ -511,10 +538,15 @@ func getTime(address string, opt *QueryOptions) (*header, ntpTime, error) {
 		}
 	}
 
-	// Append an authentication MAC if requested.
-	if opt.Auth.Type != AuthNone {
-		appendMAC(&xmitBuf, opt.Auth, decodedAuthKey)
+	// If using symmetric key authentication, decode and validate the auth key
+	// string.
+	authKey, err := decodeAuthKey(opt.Auth)
+	if err != nil {
+		return nil, 0, err
 	}
+
+	// Append a MAC if authentication is being used.
+	appendMAC(&xmitBuf, opt.Auth, authKey)
 
 	// Transmit the query and keep track of when it was transmitted.
 	xmitTime := time.Now()
@@ -538,7 +570,7 @@ func getTime(address string, opt *QueryOptions) (*header, ntpTime, error) {
 	}
 	recvTime := xmitTime.Add(delta)
 
-	// Deserialize the response header.
+	// Parse the response header.
 	recvBuf = recvBuf[:recvBytes]
 	recvReader := bytes.NewReader(recvBuf)
 	err = binary.Read(recvReader, binary.BigEndian, recvHdr)
@@ -552,12 +584,6 @@ func getTime(address string, opt *QueryOptions) (*header, ntpTime, error) {
 		if err != nil {
 			return nil, 0, err
 		}
-	}
-
-	// Perform authentication of the server response.
-	var authErr error
-	if opt.Auth.Type != AuthNone {
-		authErr = verifyMAC(recvBuf, opt.Auth, decodedAuthKey)
 	}
 
 	// Check for invalid fields.
@@ -577,6 +603,9 @@ func getTime(address string, opt *QueryOptions) (*header, ntpTime, error) {
 	// Correct the received message's origin time using the actual
 	// transmit time.
 	recvHdr.OriginTime = toNtpTime(xmitTime)
+
+	// Perform authentication of the server response.
+	authErr := verifyMAC(recvBuf, opt.Auth, authKey)
 
 	return recvHdr, toNtpTime(recvTime), authErr
 }
@@ -614,6 +643,42 @@ func dialWrapper(la, ra string,
 	}
 
 	return dial(la, 0, rhost, rportValue)
+}
+
+// fixHostPort examines an address in one of the accepted forms and fixes it
+// to include a port number if necessary.
+func fixHostPort(address string, defaultPort int) (fixed string, err error) {
+	// If the address is wrapped in brackets, append a port if necessary.
+	if address[0] == '[' {
+		end := strings.IndexByte(address, ']')
+		switch {
+		case end < 0:
+			return "", errors.New("missing ']' in address")
+		case end+1 == len(address):
+			return fmt.Sprintf("%s:%d", address, defaultPort), nil
+		case address[end+1] == ':':
+			return address, nil
+		default:
+			return "", errors.New("unexpected character following ']' in address")
+		}
+	}
+
+	// No colons? Must be a port-less IPv4 or domain address.
+	last := strings.LastIndexByte(address, ':')
+	if last < 0 {
+		return fmt.Sprintf("%s:%d", address, defaultPort), nil
+	}
+
+	// Exactly one colon? A port have been included along with an IPv4 or
+	// domain address. (IPv6 addresses are guaranteed to have more than one
+	// colon.)
+	prev := strings.LastIndexByte(address[:last], ':')
+	if prev < 0 {
+		return address, nil
+	}
+
+	// Two or more colons means we must have an IPv6 address without a port.
+	return fmt.Sprintf("[%s]:%d", address, defaultPort), nil
 }
 
 // generateResponse processes NTP header fields along with the its receive
@@ -725,7 +790,7 @@ func toInterval(t int8) time.Duration {
 func kissCode(id uint32) string {
 	isPrintable := func(ch byte) bool { return ch >= 32 && ch <= 126 }
 
-	b := []byte{
+	b := [4]byte{
 		byte(id >> 24),
 		byte(id >> 16),
 		byte(id >> 8),
@@ -736,5 +801,5 @@ func kissCode(id uint32) string {
 			return ""
 		}
 	}
-	return string(b)
+	return string(b[:])
 }

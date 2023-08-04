@@ -1,5 +1,5 @@
-github.com/beevik/ntp v1.2.0 h1:n1teVGbd4YM36FlGvWYfccBIdGzeaakHrTlo6RSL8mw=
-github.com/beevik/ntp v1.2.0/go.mod h1:vD6h1um4kzXpqmLTuu0cCLcC+NfvC0IC+ltmEDA8E78=
+github.com/beevik/ntp v1.3.0 h1:/w5VhpW5BGKS37vFm1p9oVk/t4HnnkKZAZIubHM6F7Q=
+github.com/beevik/ntp v1.3.0/go.mod h1:vD6h1um4kzXpqmLTuu0cCLcC+NfvC0IC+ltmEDA8E78=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
 github.com/beorn7/perks v1.0.1/go.mod h1:G2ZrVWU2WbWT9wwq4/hrbKbnv/1ERSJQ0ibhJ6rlkpw=
 github.com/cespare/xxhash/v2 v2.2.0 h1:DC2CZ1Ep5Y4k3ZQ899DldepgrayRUGE6BBZ/cd9Cj44=
