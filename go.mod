@@ -3,7 +3,7 @@ module github.com/sapcc/ntp_exporter
 go 1.20
 
 require (
-	github.com/beevik/ntp v1.2.0
+	github.com/beevik/ntp v1.3.0
 	github.com/prometheus/client_golang v1.16.0
 	github.com/sapcc/go-api-declarations v1.7.0
 	go.uber.org/automaxprocs v1.5.3
