@@ -13,6 +13,10 @@ dockerfile:
   extraIgnores:
     - "dist/"
 
+golang:
+  enableVendoring: true
+  setGoModVersion: true
+
 golangciLint:
   createConfig: true
 
@@ -39,6 +43,3 @@ renovate:
   assignees:
     - majewsky
     - SuperSandro2000
-
-vendoring:
-  enabled: true
