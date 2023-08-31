@@ -21,6 +21,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"log"
@@ -32,6 +33,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sapcc/go-api-declarations/bininfo"
+	"github.com/sapcc/go-bits/httpext"
+	"github.com/sapcc/go-bits/must"
 	_ "go.uber.org/automaxprocs"
 )
 
@@ -69,14 +72,11 @@ func main() {
 
 	logger.Println("starting ntp_exporter", version)
 
-	http.Handle(metricsPath, http.HandlerFunc(handlerMetrics))
-	http.HandleFunc("/", handlerDefault)
-
-	logger.Println("listening on", listenAddress)
-	err := http.ListenAndServe(listenAddress, nil) //nolint: gosec // no timeout is required
-	if err != nil {
-		log.Fatal(err)
-	}
+	mux := http.NewServeMux()
+	mux.Handle(metricsPath, http.HandlerFunc(handlerMetrics))
+	mux.HandleFunc("/", handlerDefault)
+	ctx := httpext.ContextWithSIGINT(context.Background(), 1*time.Second)
+	must.Succeed(httpext.ListenAndServeContext(ctx, listenAddress, mux))
 }
 
 func init() {
