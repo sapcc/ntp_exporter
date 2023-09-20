@@ -83,6 +83,10 @@ linters-settings:
   misspell:
     ignore-words:
       - strat
+  stylecheck:
+    dot-import-whitelist:
+      - github.com/onsi/ginkgo/v2
+      - github.com/onsi/gomega
   usestdlibvars:
     constant-kind: true
     crypto-hash: true
@@ -113,6 +117,7 @@ linters:
     - errorlint
     - exportloopref
     - forbidigo
+    - ginkgolinter
     - gocheckcompilerdirectives
     - gocritic
     - gofmt
