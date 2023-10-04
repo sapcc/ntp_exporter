@@ -1,6 +1,11 @@
-## v2.4.0 - TBD
+## v2.5.0 - TBD
+
+## v2.4.0 - 2023-10-11
 
 Changes:
+
+- Go was updated to version 1.21.
+- Update all dependencies to their current versions.
 
 ## v2.3.0 - 2023-06-14
 
