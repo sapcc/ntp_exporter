@@ -20,6 +20,9 @@ golang:
 golangciLint:
   createConfig: true
 
+goReleaser:
+  createConfig: true
+
 spellCheck:
   ignoreWords: ["strat"]
 
@@ -32,6 +35,8 @@ githubWorkflow:
   license:
     enabled: true
   pushContainerToGhcr:
+    enabled: true
+  release:
     enabled: true
   securityChecks:
     enabled: true
