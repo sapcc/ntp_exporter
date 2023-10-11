@@ -28,7 +28,7 @@ jobs:
       - name: Generate release info
         run: |
           go install github.com/sapcc/go-bits/tools/release-info@latest
-          release-info CHANGELOG.md $(shell git describe --tags --abbrev=0) > build/release-info
+          release-info CHANGELOG.md $(git describe --tags --abbrev=0) > build/release-info
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v5
         with:

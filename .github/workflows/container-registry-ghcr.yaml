@@ -6,8 +6,6 @@
 name: Container Registry GHCR
 "on":
   push:
-    branches:
-      - master
     tags:
       - '*'
 permissions:
