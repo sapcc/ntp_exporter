@@ -1,16 +1,16 @@
-# v2.4.0 (TBD)
+## v2.4.0 - TBD
 
 Changes:
 
-# v2.3.0 (2023-06-14)
+## v2.3.0 - 2023-06-14
 
 Changes:
 
-- The container image moved from Docker Hub to ghcr.io and can now be found under ``ghcr.io/sapcc/ntp_exporter:vX.X.X``
-- Add automaxprocs
+- The container image moved from Docker Hub to ghcr.io and can now be found under `ghcr.io/sapcc/ntp_exporter:vX.X.X`.
+- Add automaxprocs.
 - Update all dependencies to their current versions.
 
-# v2.2.0 (2023-04-04)
+## v2.2.0 - 2023-04-04
 
 Changes:
 
@@ -18,7 +18,7 @@ Changes:
 - Golang was updated to version 1.20.
 - Update all dependencies to their current versions.
 
-# v2.1.0 (2022-06-17)
+## v2.1.0 - 2022-06-17
 
 Changes:
 
@@ -26,19 +26,19 @@ Changes:
 - The `ntp_stratum` metric now has the label `server`, and is reported separately for each server.
 - Go got updated to version 1.18.
 
-# v2.0.2 (2022-05-04)
+## v2.0.2 - 2022-05-04
 
 Changes:
 
 - Update all dependencies to their current versions.
 
-# v2.0.1 (2021-09-24)
+## v2.0.1 - 2021-09-24
 
 Changes:
 
 - Update all dependencies to their current versions.
 
-# v2.0.0 (2020-08-04)
+## v2.0.0 - 2020-08-04
 
 **Backwards-incompatible changes:**
 
@@ -50,25 +50,25 @@ Changes:
 
 - Update all dependencies to their current versions.
 
-# v1.1.3 (2020-05-28)
+## v1.1.3 - 2020-05-28
 
 Changes:
 
 - Update all dependencies to their current versions.
 
-# v1.1.2 (2020-04-08)
+## v1.1.2 - 2020-04-08
 
 Changes:
 
 - Update all dependencies to their current versions.
 
-# v1.1.1 (2020-02-10)
+## v1.1.1 - 2020-02-10
 
 Changes:
 
 - Update all dependencies to their current versions.
 
-# v1.1.0 (2019-11-19)
+## v1.1.0 - 2019-11-19
 
 New features:
 
@@ -87,6 +87,6 @@ Changes:
 
 [alloc]: https://github.com/prometheus/prometheus/wiki/Default-port-allocations#exporters-starting-at-9100
 
-# v1.0.0 (2017-01-13)
+## v1.0.0 - 2017-01-13
 
 Initial release.
