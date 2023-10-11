@@ -9,7 +9,7 @@ name: goreleaser
     tags:
       - v[0-9]+.[0-9]+.[0-9]+
 permissions:
-  contents: read
+  contents: write
   packages: write
 jobs:
   release:
@@ -28,6 +28,7 @@ jobs:
       - name: Generate release info
         run: |
           go install github.com/sapcc/go-bits/tools/release-info@latest
+          mkdir -p build
           release-info CHANGELOG.md $(git describe --tags --abbrev=0) > build/release-info
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v5
