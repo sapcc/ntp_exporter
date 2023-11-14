@@ -1,21 +1,29 @@
-## v2.5.0 - TBD
+## v2.6.0 - TBD
 
 Changes:
+
+## v2.5.0 - 2023-11-14
+
+Changes:
+- The Go used to build the prebuilt binaries was updated to version 1.21.4.
+- The Docker container no longer contains apk or its dependencies. This removes openssl and reduces the amount of vulnerabilities found.
+- The prebuilt containers now contain an linux/arm64 variant.
+- Updated all dependencies to their current versions.
 
 ## v2.4.0 - 2023-10-11
 
 Changes:
 
 - Go was updated to version 1.21.
-- Update all dependencies to their current versions.
+- Updated all dependencies to their current versions.
 
 ## v2.3.0 - 2023-06-14
 
 Changes:
 
 - The container image moved from Docker Hub to ghcr.io and can now be found under `ghcr.io/sapcc/ntp_exporter:vX.X.X`.
-- Add automaxprocs.
-- Update all dependencies to their current versions.
+- Add automaxprocs
+- Updated all dependencies to their current versions.
 
 ## v2.2.0 - 2023-04-04
 
