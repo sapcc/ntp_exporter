@@ -80,9 +80,6 @@ linters-settings:
     check-shadowing: true
   nolintlint:
     require-specific: true
-  misspell:
-    ignore-words:
-      - strat
   stylecheck:
     dot-import-whitelist:
       - github.com/onsi/ginkgo/v2

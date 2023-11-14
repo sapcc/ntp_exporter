@@ -23,9 +23,6 @@ golangciLint:
 goReleaser:
   createConfig: true
 
-spellCheck:
-  ignoreWords: ["strat"]
-
 githubWorkflow:
   ci:
     # Even though there are no tests, we can still use the CI workflow for linting and
@@ -40,9 +37,6 @@ githubWorkflow:
     enabled: true
   securityChecks:
     enabled: true
-  spellCheck:
-    enabled: true
-
 renovate:
   enabled: true
   assignees:
