@@ -8,10 +8,6 @@ archives:
       - LICENSE
       - README.md
 
-before:
-  hooks:
-    - go mod tidy
-
 checksum:
   name_template: "checksums.txt"
 
