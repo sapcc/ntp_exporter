@@ -5,8 +5,8 @@ go 1.21
 require (
 	github.com/beevik/ntp v1.3.1
 	github.com/prometheus/client_golang v1.18.0
-	github.com/sapcc/go-api-declarations v1.10.6
-	github.com/sapcc/go-bits v0.0.0-20240118093656-a4f981f7fa46
+	github.com/sapcc/go-api-declarations v1.10.7
+	github.com/sapcc/go-bits v0.0.0-20240201031405-faeba90d7591
 	go.uber.org/automaxprocs v1.5.3
 )
 
