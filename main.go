@@ -100,7 +100,7 @@ func handlerMetrics(w http.ResponseWriter, r *http.Request) {
 	if ntpSource == "http" {
 		for _, i := range []string{"target", "protocol", "duration"} {
 			if r.URL.Query().Get(i) == "" {
-				http.Error(w, fmt.Sprintf("Get parameter is empty: %s", i), http.StatusBadRequest)
+				http.Error(w, "Get parameter is empty: "+i, http.StatusBadRequest)
 				return
 			}
 		}
