@@ -14,6 +14,11 @@ endif
 
 default: build-all
 
+prepare-static-check: FORCE
+	@if ! hash golangci-lint 2>/dev/null; then printf "\e[1;36m>> Installing golangci-lint (this may take a while)...\e[0m\n"; go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest; fi
+	@if ! hash go-licence-detector 2>/dev/null; then printf "\e[1;36m>> Installing go-licence-detector...\e[0m\n"; go install go.elastic.co/go-licence-detector@latest; fi
+	@if ! hash addlicense 2>/dev/null; then  printf "\e[1;36m>> Installing addlicense...\e[0m\n";  go install github.com/google/addlicense@latest; fi
+
 GO_BUILDFLAGS = -mod vendor
 GO_LDFLAGS =
 GO_TESTENV =
@@ -51,11 +56,6 @@ comma := ,
 
 check: FORCE static-check build/cover.html build-all
 	@printf "\e[1;32m>> All checks successful.\e[0m\n"
-
-prepare-static-check: FORCE
-	@if ! hash golangci-lint 2>/dev/null; then printf "\e[1;36m>> Installing golangci-lint (this may take a while)...\e[0m\n"; go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest; fi
-	@if ! hash go-licence-detector 2>/dev/null; then printf "\e[1;36m>> Installing go-licence-detector...\e[0m\n"; go install go.elastic.co/go-licence-detector@latest; fi
-	@if ! hash addlicense 2>/dev/null; then  printf "\e[1;36m>> Installing addlicense...\e[0m\n";  go install github.com/google/addlicense@latest; fi
 
 run-golangci-lint: FORCE prepare-static-check
 	@printf "\e[1;36m>> golangci-lint\e[0m\n"
@@ -119,6 +119,9 @@ help: FORCE
 	@printf "  \e[36mvars\e[0m                       Display values of relevant Makefile variables.\n"
 	@printf "  \e[36mhelp\e[0m                       Display this help.\n"
 	@printf "\n"
+	@printf "\e[1mPrepare\e[0m\n"
+	@printf "  \e[36mprepare-static-check\e[0m       Install any tools required by static-check. This is used in CI before dropping privileges, you should probably install all the tools using your package manager\n"
+	@printf "\n"
 	@printf "\e[1mBuild\e[0m\n"
 	@printf "  \e[36mbuild-all\e[0m                  Build all binaries.\n"
 	@printf "  \e[36mbuild/ntp_exporter\e[0m         Build ntp_exporter.\n"
@@ -126,7 +129,6 @@ help: FORCE
 	@printf "\n"
 	@printf "\e[1mTest\e[0m\n"
 	@printf "  \e[36mcheck\e[0m                      Run the test suite (unit tests and golangci-lint).\n"
-	@printf "  \e[36mprepare-static-check\e[0m       Install any tools required by static-check. This is used in CI before dropping privileges, you should probably install all the tools using your package manager\n"
 	@printf "  \e[36mrun-golangci-lint\e[0m          Install and run golangci-lint. Installing is used in CI, but you should probably install golangci-lint using your package manager.\n"
 	@printf "  \e[36mbuild/cover.out\e[0m            Run tests and generate coverage report.\n"
 	@printf "  \e[36mbuild/cover.html\e[0m           Generate an HTML file with source code annotations from the coverage report.\n"
