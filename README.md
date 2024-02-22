@@ -18,6 +18,7 @@ These are the metrics supported.
 - `ntp_precision_seconds`
 - `ntp_leap`
 - `ntp_scrape_duration_seconds`
+- `ntp_server_reachable`
 
 As an alternative to [the node-exporter's `time` module](https://github.com/prometheus/node_exporter/blob/master/docs/TIME.md), this exporter does not require an NTP component on localhost that it can talk to. We only look at the system clock and talk to the configured NTP server(s).
 
@@ -60,10 +61,18 @@ and connection options is defined by command-line options:
 ```
 -ntp.measurement-duration duration
    Duration of measurements in case of high (>10ms) drift. (default 30s)
+-ntp.high-drift duration
+   High drift threshold. (default 10ms)
 -ntp.protocol-version int
    NTP protocol version to use. (default 4)
 -ntp.server string
    NTP server to use (required).
+```
+
+Command-line usage example:
+
+```sh
+ntp_exporter -ntp.server ntp.example.com -web.telemetry-path "/probe" -ntp.measurement-duration "5s" -ntp.high-drift "50ms"
 ```
 
 ### Mode 2: Variable NTP server
@@ -75,11 +84,12 @@ request:
 - `target`: NTP server to use
 - `protocol`: NTP protocol version (2, 3 or 4)
 - `duration`: duration of measurements in case of high drift
+- `high-drift`: High drift threshold to trigger multiple probing
 
 For example:
 
 ```sh
-$ curl 'http://localhost:9559/metrics?target=ntp.example.com&protocol=4&duration=10s'
+$ curl 'http://localhost:9559/metrics?target=ntp.example.com&protocol=4&duration=10s&high-drift=100ms'
 ```
 
 ## Frequently asked questions (FAQ)
