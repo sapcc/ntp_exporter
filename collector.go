@@ -30,11 +30,12 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-func CollectorInitial(target string, protocol int, duration time.Duration) Collector {
+func CollectorInitial(target string, protocol int, duration, highDrift time.Duration) Collector {
 	return Collector{
 		NtpServer:              target,
 		NtpProtocolVersion:     protocol,
 		NtpMeasurementDuration: duration,
+		NtpHighDrift:           highDrift,
 		buildInfo: prometheus.NewGaugeFunc(prometheus.GaugeOpts{
 			Namespace:   "ntp",
 			Name:        "build_info",
@@ -91,6 +92,11 @@ func CollectorInitial(target string, protocol int, duration time.Duration) Colle
 			Name:      "scrape_duration_seconds",
 			Help:      "ntp_exporter: Duration of a scrape job.",
 		}),
+		serverReachable: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Namespace: "ntp",
+			Name:      "server_reachable",
+			Help:      "True if the NTP server is reachable by the NTP exporter.",
+		}, []string{"server"}),
 	}
 }
 
@@ -99,6 +105,7 @@ type Collector struct {
 	NtpServer              string
 	NtpProtocolVersion     int
 	NtpMeasurementDuration time.Duration
+	NtpHighDrift           time.Duration
 	buildInfo              prometheus.GaugeFunc
 	stratum                *prometheus.GaugeVec
 	drift                  *prometheus.GaugeVec
@@ -110,6 +117,7 @@ type Collector struct {
 	precision              *prometheus.GaugeVec
 	leap                   *prometheus.GaugeVec
 	scrapeDuration         prometheus.Summary
+	serverReachable        *prometheus.GaugeVec
 }
 
 // A single measurement returned by ntp server
@@ -138,11 +146,15 @@ func (c Collector) Describe(ch chan<- *prometheus.Desc) {
 	c.precision.Describe(ch)
 	c.leap.Describe(ch)
 	c.scrapeDuration.Describe(ch)
+	c.serverReachable.Describe(ch)
 }
 
 // Collect implements the prometheus.Collector interface.
 func (c Collector) Collect(ch chan<- prometheus.Metric) {
 	err := c.measure()
+
+	c.serverReachable.Collect(ch)
+
 	//only report data when measurement was successful
 	if err == nil {
 		c.buildInfo.Collect(ch)
@@ -163,17 +175,16 @@ func (c Collector) Collect(ch chan<- prometheus.Metric) {
 }
 
 func (c Collector) measure() error {
-	const highDrift = 0.01
-
 	begin := time.Now()
 	measurement, err := c.getClockOffsetAndStratum()
 
 	if err != nil {
+		c.serverReachable.WithLabelValues(c.NtpServer).Set(0)
 		return fmt.Errorf("couldn't get NTP measurement: %w", err)
 	}
 
 	//if clock drift is unusually high (e.g. >10ms): repeat measurements for 30 seconds and submit median value
-	if measurement.clockOffset > highDrift {
+	if measurement.clockOffset > c.NtpHighDrift.Seconds() {
 		//arrays of measurements used to calculate median
 		var measurementsClockOffset []float64
 		var measurementsStratum []float64
@@ -185,10 +196,11 @@ func (c Collector) measure() error {
 		var measurementsPrecision []float64
 		var measurementsLeap []float64
 
-		log.Printf("WARN: clock drift is above %.2fs, taking multiple measurements for %.2f seconds", highDrift, c.NtpMeasurementDuration.Seconds())
+		log.Printf("WARN: clock drift is above %.3fs, taking multiple measurements for %.2f seconds", c.NtpHighDrift.Seconds(), c.NtpMeasurementDuration.Seconds())
 		for time.Since(begin) < c.NtpMeasurementDuration {
 			nextMeasurement, err := c.getClockOffsetAndStratum()
 			if err != nil {
+				c.serverReachable.WithLabelValues(c.NtpServer).Set(0)
 				return fmt.Errorf("couldn't get NTP measurement: %w", err)
 			}
 
@@ -223,6 +235,7 @@ func (c Collector) measure() error {
 	c.rootDistance.WithLabelValues(c.NtpServer).Set(measurement.rootDistance)
 	c.precision.WithLabelValues(c.NtpServer).Set(measurement.precision)
 	c.leap.WithLabelValues(c.NtpServer).Set(measurement.leap)
+	c.serverReachable.WithLabelValues(c.NtpServer).Set(1)
 
 	c.scrapeDuration.Observe(time.Since(begin).Seconds())
 	return nil

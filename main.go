@@ -45,6 +45,7 @@ var (
 	ntpServer              string
 	ntpProtocolVersion     int
 	ntpMeasurementDuration time.Duration
+	ntpHighDrift           time.Duration
 	ntpSource              string
 )
 
@@ -86,6 +87,7 @@ func init() {
 	flag.StringVar(&ntpServer, "ntp.server", "", "NTP server to use (required).")
 	flag.IntVar(&ntpProtocolVersion, "ntp.protocol-version", 4, "NTP protocol version to use.")
 	flag.DurationVar(&ntpMeasurementDuration, "ntp.measurement-duration", 30*time.Second, "Duration of measurements in case of high (>10ms) drift.")
+	flag.DurationVar(&ntpHighDrift, "ntp.high-drift", 10*time.Millisecond, "High drift threshold.")
 	flag.StringVar(&ntpSource, "ntp.source", "cli", "source of information about ntp server (cli / http).")
 	flag.Parse()
 }
@@ -96,6 +98,7 @@ func handlerMetrics(w http.ResponseWriter, r *http.Request) {
 	s := ntpServer
 	p := ntpProtocolVersion
 	d := ntpMeasurementDuration
+	hd := ntpHighDrift
 
 	if ntpSource == "http" {
 		for _, i := range []string{"target", "protocol", "duration"} {
@@ -123,10 +126,17 @@ func handlerMetrics(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
+
+		if u, err := time.ParseDuration(r.URL.Query().Get("high-drift")); err == nil {
+			hd = u
+		} else {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
 	}
 
 	registry := prometheus.NewRegistry()
-	registry.MustRegister(CollectorInitial(s, p, d))
+	registry.MustRegister(CollectorInitial(s, p, d, hd))
 	h := promhttp.HandlerFor(registry, promhttp.HandlerOpts{ErrorLog: logger})
 	h.ServeHTTP(w, r)
 }
