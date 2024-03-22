@@ -143,7 +143,7 @@ func (c Collector) Describe(ch chan<- *prometheus.Desc) {
 // Collect implements the prometheus.Collector interface.
 func (c Collector) Collect(ch chan<- prometheus.Metric) {
 	err := c.measure()
-	//only report data when measurement was successful
+	// only report data when measurement was successful
 	if err == nil {
 		c.buildInfo.Collect(ch)
 		c.drift.Collect(ch)
@@ -172,9 +172,9 @@ func (c Collector) measure() error {
 		return fmt.Errorf("couldn't get NTP measurement: %w", err)
 	}
 
-	//if clock drift is unusually high (e.g. >10ms): repeat measurements for 30 seconds and submit median value
+	// if clock drift is unusually high (e.g. >10ms): repeat measurements for 30 seconds and submit median value
 	if measurement.clockOffset > highDrift {
-		//arrays of measurements used to calculate median
+		// arrays of measurements used to calculate median
 		var measurementsClockOffset []float64
 		var measurementsStratum []float64
 		var measurementsRTT []float64
