@@ -19,7 +19,7 @@ permissions:
   security-events: write
 jobs:
   analyze:
-    name: Analyze
+    name: CodeQL
     runs-on: ubuntu-latest
     steps:
       - name: Check out code
@@ -28,11 +28,12 @@ jobs:
         uses: actions/setup-go@v5
         with:
           check-latest: true
-          go-version: "1.22"
+          go-version: 1.22.2
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
         with:
           languages: go
+          queries: security-extended
       - name: Autobuild
         uses: github/codeql-action/autobuild@v3
       - name: Perform CodeQL Analysis

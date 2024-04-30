@@ -155,7 +155,7 @@ func (c Collector) Collect(ch chan<- prometheus.Metric) {
 
 	c.serverReachable.Collect(ch)
 
-	//only report data when measurement was successful
+	// only report data when measurement was successful
 	if err == nil {
 		c.buildInfo.Collect(ch)
 		c.drift.Collect(ch)
@@ -183,9 +183,9 @@ func (c Collector) measure() error {
 		return fmt.Errorf("couldn't get NTP measurement: %w", err)
 	}
 
-	//if clock drift is unusually high (e.g. >10ms): repeat measurements for 30 seconds and submit median value
+	// if clock drift is unusually high (e.g. >10ms): repeat measurements for 30 seconds and submit median value
 	if measurement.clockOffset > c.NtpHighDrift.Seconds() {
-		//arrays of measurements used to calculate median
+		// arrays of measurements used to calculate median
 		var measurementsClockOffset []float64
 		var measurementsStratum []float64
 		var measurementsRTT []float64
