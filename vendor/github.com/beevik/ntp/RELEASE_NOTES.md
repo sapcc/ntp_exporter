@@ -1,3 +1,17 @@
+Release v1.4.1
+==============
+
+**Updates**
+
+* Upgraded package dependencies to retrieve security fixes.
+
+Release v1.4.0
+==============
+
+**Changes**
+
+* Added a protocol `Version` field to the `Response` struct.
+
 Release v1.3.1
 ==============
 
