@@ -4,7 +4,7 @@ go 1.22
 
 require (
 	github.com/beevik/ntp v1.4.1
-	github.com/prometheus/client_golang v1.19.0
+	github.com/prometheus/client_golang v1.19.1
 	github.com/sapcc/go-api-declarations v1.11.2
 	github.com/sapcc/go-bits v0.0.0-20240509162919-cebeb2d4844a
 	go.uber.org/automaxprocs v1.5.3
