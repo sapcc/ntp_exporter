@@ -1,6 +1,14 @@
-## v2.6.0 - TBD
+## v2.7.0 - TBD
 
 Changes:
+
+## v2.6.0 - 2024-05-17
+
+Changes:
+- Add new metric named ntp\_server\_reachable which returns 1 if the ntp server is reachable
+- The high drift threshold is now configurable via the `high-drift` query string
+- The Go used to build the prebuilt binaries was updated to version 1.22.3.
+- Updated all dependencies to their current versions.
 
 ## v2.5.0 - 2023-11-14
 
