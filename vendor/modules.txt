@@ -28,7 +28,7 @@ github.com/prometheus/procfs/internal/util
 # github.com/sapcc/go-api-declarations v1.11.2
 ## explicit; go 1.21
 github.com/sapcc/go-api-declarations/bininfo
-# github.com/sapcc/go-bits v0.0.0-20240516084938-1c041b7a84ce
+# github.com/sapcc/go-bits v0.0.0-20240530080859-f4579fb3a074
 ## explicit; go 1.22
 github.com/sapcc/go-bits/httpext
 github.com/sapcc/go-bits/logg
@@ -39,13 +39,13 @@ go.uber.org/automaxprocs
 go.uber.org/automaxprocs/internal/cgroups
 go.uber.org/automaxprocs/internal/runtime
 go.uber.org/automaxprocs/maxprocs
-# golang.org/x/net v0.24.0
+# golang.org/x/net v0.25.0
 ## explicit; go 1.18
 golang.org/x/net/bpf
 golang.org/x/net/internal/iana
 golang.org/x/net/internal/socket
 golang.org/x/net/ipv4
-# golang.org/x/sys v0.19.0
+# golang.org/x/sys v0.20.0
 ## explicit; go 1.18
 golang.org/x/sys/unix
 golang.org/x/sys/windows
