@@ -2,6 +2,13 @@
 
 Changes:
 
+## v2.6.1 - 2024-07-08
+
+Changes:
+- The Go compiler that used to compile the release binaries was updated to version 1.22.5.
+- The Alpine used in the release container was updated to version 3.20.
+- Updated all go dependencies to their latest versions.
+
 ## v2.6.0 - 2024-05-17
 
 Changes:
