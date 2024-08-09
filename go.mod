@@ -6,7 +6,7 @@ require (
 	github.com/beevik/ntp v1.4.3
 	github.com/prometheus/client_golang v1.19.1
 	github.com/sapcc/go-api-declarations v1.12.1
-	github.com/sapcc/go-bits v0.0.0-20240801093859-8ef04d19f38d
+	github.com/sapcc/go-bits v0.0.0-20240808095728-a371e948855b
 	go.uber.org/automaxprocs v1.5.3
 )
 
@@ -18,6 +18,6 @@ require (
 	github.com/prometheus/common v0.55.0 // indirect
 	github.com/prometheus/procfs v0.15.1 // indirect
 	golang.org/x/net v0.26.0 // indirect
-	golang.org/x/sys v0.22.0 // indirect
+	golang.org/x/sys v0.23.0 // indirect
 	google.golang.org/protobuf v1.34.2 // indirect
 )
