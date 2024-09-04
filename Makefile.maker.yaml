@@ -27,6 +27,7 @@ githubWorkflow:
     enabled: true
   pushContainerToGhcr:
     enabled: true
+    tagStrategy: [ latest, semver ]
   release:
     enabled: true
 
