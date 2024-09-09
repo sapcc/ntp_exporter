@@ -1,6 +1,11 @@
-## v2.7.0 - TBD
+## v2.8.0 - TBD
 
 Changes:
+
+## v2.7.0 - 2024-09-10
+
+Changes:
+- Renamed the `high-drift` query string in variable mode to `high_drift`. This makes it easies to use with Prometheus which does not accept dashes in label names.
 
 ## v2.6.1 - 2024-07-08
 
