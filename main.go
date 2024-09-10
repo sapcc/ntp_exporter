@@ -127,7 +127,7 @@ func handlerMetrics(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		if u, err := time.ParseDuration(r.URL.Query().Get("high-drift")); err == nil {
+		if u, err := time.ParseDuration(r.URL.Query().Get("high_drift")); err == nil {
 			hd = u
 		} else {
 			http.Error(w, err.Error(), http.StatusBadRequest)

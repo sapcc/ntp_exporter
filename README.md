@@ -84,12 +84,12 @@ request:
 - `target`: NTP server to use
 - `protocol`: NTP protocol version (2, 3 or 4)
 - `duration`: duration of measurements in case of high drift
-- `high-drift`: High drift threshold to trigger multiple probing
+- `high_drift`: High drift threshold to trigger multiple probing
 
 For example:
 
 ```sh
-$ curl 'http://localhost:9559/metrics?target=ntp.example.com&protocol=4&duration=10s&high-drift=100ms'
+$ curl 'http://localhost:9559/metrics?target=ntp.example.com&protocol=4&duration=10s&high_drift=100ms'
 ```
 
 ## Frequently asked questions (FAQ)
