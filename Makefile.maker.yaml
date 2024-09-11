@@ -27,6 +27,7 @@ githubWorkflow:
     enabled: true
   pushContainerToGhcr:
     enabled: true
+    platforms: "linux/amd64,linux/arm64"
     tagStrategy: [ latest, semver ]
   release:
     enabled: true
