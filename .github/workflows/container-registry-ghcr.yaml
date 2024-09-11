@@ -8,6 +8,7 @@ name: Container Registry GHCR
   push:
     tags:
       - '*'
+  workflow_dispatch: {}
 permissions:
   contents: read
   packages: write
