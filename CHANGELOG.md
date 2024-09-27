@@ -1,6 +1,7 @@
-## v2.8.0 - TBD
+## v2.7.1 - TBD
 
 Changes:
+- Fix a server error being returned if the optional `high_drift` parameter is not given.
 
 ## v2.7.0 - 2024-09-10
 
