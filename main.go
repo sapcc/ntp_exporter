@@ -101,16 +101,17 @@ func handlerMetrics(w http.ResponseWriter, r *http.Request) {
 	hd := ntpHighDrift
 
 	if ntpSource == "http" {
+		query := r.URL.Query()
 		for _, i := range []string{"target", "protocol", "duration"} {
-			if r.URL.Query().Get(i) == "" {
+			if query.Get(i) == "" {
 				http.Error(w, "Get parameter is empty: "+i, http.StatusBadRequest)
 				return
 			}
 		}
 
-		s = r.URL.Query().Get("target")
+		s = query.Get("target")
 
-		if v, err := strconv.ParseInt(r.URL.Query().Get("protocol"), 10, 32); err != nil {
+		if v, err := strconv.ParseInt(query.Get("protocol"), 10, 32); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		} else if v < 2 || v > 4 {
@@ -120,15 +121,15 @@ func handlerMetrics(w http.ResponseWriter, r *http.Request) {
 			p = int(v)
 		}
 
-		if t, err := time.ParseDuration(r.URL.Query().Get("duration")); err == nil {
+		if t, err := time.ParseDuration(query.Get("duration")); err == nil {
 			d = t
 		} else {
 			http.Error(w, "while parsing duration: "+err.Error(), http.StatusBadRequest)
 			return
 		}
 
-		if r.URL.Query().Get("high_drift") != "" {
-			if u, err := time.ParseDuration(r.URL.Query().Get("high_drift")); err == nil {
+		if query.Get("high_drift") != "" {
+			if u, err := time.ParseDuration(query.Get("high_drift")); err == nil {
 				hd = u
 			} else {
 				http.Error(w, "while parsing high_drift: "+err.Error(), http.StatusBadRequest)
