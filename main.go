@@ -123,15 +123,17 @@ func handlerMetrics(w http.ResponseWriter, r *http.Request) {
 		if t, err := time.ParseDuration(r.URL.Query().Get("duration")); err == nil {
 			d = t
 		} else {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			http.Error(w, "while parsing duration: "+err.Error(), http.StatusBadRequest)
 			return
 		}
 
-		if u, err := time.ParseDuration(r.URL.Query().Get("high_drift")); err == nil {
-			hd = u
-		} else {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
+		if r.URL.Query().Get("high_drift") != "" {
+			if u, err := time.ParseDuration(r.URL.Query().Get("high_drift")); err == nil {
+				hd = u
+			} else {
+				http.Error(w, "while parsing high_drift: "+err.Error(), http.StatusBadRequest)
+				return
+			}
 		}
 	}
 
