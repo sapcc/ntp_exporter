@@ -6,7 +6,7 @@ process. Follow the instructions below for creating a new release.
 1. Ensure local `master` branch is up to date with `origin/master`:
 
    ```sh
-   git fetch --tags && git pull --tags
+   git fetch --all --tags
    ```
 
 2. Ensure all checks are passing:
@@ -33,6 +33,7 @@ process. Follow the instructions below for creating a new release.
 
    ```sh
    git tag vX.Y.Z
+   git push
    git push --tags
    ```
 
