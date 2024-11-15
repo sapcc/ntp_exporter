@@ -41,7 +41,7 @@ github.com/prometheus/procfs/internal/util
 # github.com/sapcc/go-api-declarations v1.12.9
 ## explicit; go 1.21
 github.com/sapcc/go-api-declarations/bininfo
-# github.com/sapcc/go-bits v0.0.0-20241107000306-6eb1626e14d0
+# github.com/sapcc/go-bits v0.0.0-20241113133958-a93c0408d3e5
 ## explicit; go 1.23
 github.com/sapcc/go-bits/httpext
 github.com/sapcc/go-bits/logg
