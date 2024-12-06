@@ -1,3 +1,8 @@
+<!--
+SPDX-FileCopyrightText: SAP SE
+SPDX-License-Identifier: Apache-2.0
+-->
+
 # Release Guide
 
 We use [GoReleaser][goreleaser] and GitHub workflows for automating the release
