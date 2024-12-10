@@ -23,6 +23,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"math"
 	"sort"
 	"time"
 
@@ -183,8 +184,9 @@ func (c Collector) measure() error {
 		return fmt.Errorf("couldn't get NTP measurement: %w", err)
 	}
 
-	// if clock drift is unusually high (e.g. >10ms): repeat measurements for 30 seconds and submit median value
-	if measurement.clockOffset > c.NtpHighDrift.Seconds() {
+	// if absolute clock drift is unusually high (e.g. >10ms):
+	// repeat measurements for the configured amount of seconds and submit median value
+	if math.Abs(measurement.clockOffset) > c.NtpHighDrift.Seconds() {
 		// arrays of measurements used to calculate median
 		var measurementsClockOffset []float64
 		var measurementsStratum []float64

@@ -2,6 +2,7 @@
 
 Bug fixes:
 - Fixed an index out of range when the clock drift is high when running shorter than the multiple measurement duration
+- Fixed high drift not considering negative drift
 
 Changes:
 - Updated all go dependencies to their latest versions.
