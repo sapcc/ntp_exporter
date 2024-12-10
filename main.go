@@ -34,6 +34,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sapcc/go-api-declarations/bininfo"
 	"github.com/sapcc/go-bits/httpext"
+	"github.com/sapcc/go-bits/logg"
 	"github.com/sapcc/go-bits/must"
 	_ "go.uber.org/automaxprocs"
 )
@@ -86,8 +87,8 @@ func init() {
 	flag.StringVar(&metricsPath, "web.telemetry-path", "/metrics", "Path under which to expose metrics.")
 	flag.StringVar(&ntpServer, "ntp.server", "", "NTP server to use (required).")
 	flag.IntVar(&ntpProtocolVersion, "ntp.protocol-version", 4, "NTP protocol version to use.")
-	flag.DurationVar(&ntpMeasurementDuration, "ntp.measurement-duration", 30*time.Second, "Duration of measurements in case of high (>10ms) drift.")
-	flag.DurationVar(&ntpHighDrift, "ntp.high-drift", 10*time.Millisecond, "High drift threshold.")
+	flag.DurationVar(&ntpMeasurementDuration, "ntp.measurement-duration", 30*time.Second, "Duration of measurements in case of high drift.")
+	flag.DurationVar(&ntpHighDrift, "ntp.high-drift", 10*time.Millisecond, "Absolute high drift threshold.")
 	flag.StringVar(&ntpSource, "ntp.source", "cli", "source of information about ntp server (cli / http).")
 	flag.Parse()
 }
@@ -99,6 +100,13 @@ func handlerMetrics(w http.ResponseWriter, r *http.Request) {
 	p := ntpProtocolVersion
 	d := ntpMeasurementDuration
 	hd := ntpHighDrift
+
+	if d < 0 {
+		logger.Fatal("ntp.measurement-duration cannot be negative")
+	}
+	if hd < 0 {
+		logg.Fatal("ntp.high-drift cannot be negative")
+	}
 
 	if ntpSource == "http" {
 		query := r.URL.Query()
@@ -122,6 +130,10 @@ func handlerMetrics(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if t, err := time.ParseDuration(query.Get("duration")); err == nil {
+			if t < 0 {
+				http.Error(w, "high_drift cannot be negative", http.StatusBadRequest)
+				return
+			}
 			d = t
 		} else {
 			http.Error(w, "while parsing duration: "+err.Error(), http.StatusBadRequest)
@@ -130,6 +142,10 @@ func handlerMetrics(w http.ResponseWriter, r *http.Request) {
 
 		if query.Get("high_drift") != "" {
 			if u, err := time.ParseDuration(query.Get("high_drift")); err == nil {
+				if u < 0 {
+					http.Error(w, "high_drift cannot be negative", http.StatusBadRequest)
+					return
+				}
 				hd = u
 			} else {
 				http.Error(w, "while parsing high_drift: "+err.Error(), http.StatusBadRequest)
