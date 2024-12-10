@@ -197,7 +197,7 @@ func (c Collector) measure() error {
 		var measurementsLeap []float64
 
 		log.Printf("WARN: clock drift is above %.3fs, taking multiple measurements for %.2f seconds", c.NtpHighDrift.Seconds(), c.NtpMeasurementDuration.Seconds())
-		for time.Since(begin) < c.NtpMeasurementDuration {
+		for next := true; next; next = time.Since(begin) < c.NtpMeasurementDuration {
 			nextMeasurement, err := c.getClockOffsetAndStratum()
 			if err != nil {
 				c.serverReachable.WithLabelValues(c.NtpServer).Set(0)
