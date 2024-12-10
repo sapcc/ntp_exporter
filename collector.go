@@ -23,6 +23,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"math"
 	"sort"
 	"time"
 
@@ -183,8 +184,9 @@ func (c Collector) measure() error {
 		return fmt.Errorf("couldn't get NTP measurement: %w", err)
 	}
 
-	// if clock drift is unusually high (e.g. >10ms): repeat measurements for 30 seconds and submit median value
-	if measurement.clockOffset > c.NtpHighDrift.Seconds() {
+	// if absolute clock drift is unusually high (e.g. >10ms):
+	// repeat measurements for the configured amount of seconds and submit median value
+	if math.Abs(measurement.clockOffset) > c.NtpHighDrift.Seconds() {
 		// arrays of measurements used to calculate median
 		var measurementsClockOffset []float64
 		var measurementsStratum []float64
@@ -197,7 +199,7 @@ func (c Collector) measure() error {
 		var measurementsLeap []float64
 
 		log.Printf("WARN: clock drift is above %.3fs, taking multiple measurements for %.2f seconds", c.NtpHighDrift.Seconds(), c.NtpMeasurementDuration.Seconds())
-		for time.Since(begin) < c.NtpMeasurementDuration {
+		for next := true; next; next = time.Since(begin) < c.NtpMeasurementDuration {
 			nextMeasurement, err := c.getClockOffsetAndStratum()
 			if err != nil {
 				c.serverReachable.WithLabelValues(c.NtpServer).Set(0)

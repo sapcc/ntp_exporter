@@ -1,11 +1,18 @@
 ## v2.8.0 - TBD
 
+Bug fixes:
+- Fixed an index out of range when the clock drift is high when running shorter than the multiple measurement duration
+- Fixed high drift not considering negative drift
+
 Changes:
+- Updated all go dependencies to their latest versions.
 
 ## v2.7.1 - 2024-09-27
 
+Bug fixes:
+- Fixed a server error being returned if the optional `high_drift` parameter is not given.
+
 Changes:
-- Fix a server error being returned if the optional `high_drift` parameter is not given.
 - Updated all go dependencies to their latest versions.
 
 ## v2.7.0 - 2024-09-10
