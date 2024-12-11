@@ -1,4 +1,4 @@
-## v2.8.0 - TBD
+## v2.8.0 - 2024-12-11
 
 Bug fixes:
 - Fixed an index out of range when the clock drift is high when running shorter than the multiple measurement duration
