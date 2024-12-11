@@ -130,7 +130,7 @@ func handlerMetrics(w http.ResponseWriter, r *http.Request) {
 
 		if t, err := time.ParseDuration(query.Get("duration")); err == nil {
 			if t < 0 {
-				http.Error(w, "high_drift cannot be negative", http.StatusBadRequest)
+				http.Error(w, "duration cannot be negative", http.StatusBadRequest)
 				return
 			}
 			d = t
