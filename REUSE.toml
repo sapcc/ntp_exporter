@@ -1,6 +1,8 @@
 # SPDX-FileCopyrightText: SAP SE
 # SPDX-License-Identifier: Apache-2.0
 version = 1
+SPDX-PackageName = "ntp_exporter"
+SPDX-PackageDownloadLocation = "https://github.com/sapcc/ntp_exporter"
 
 [[annotations]]
 path = [
