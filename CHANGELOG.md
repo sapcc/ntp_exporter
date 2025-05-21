@@ -6,6 +6,7 @@ SPDX-License-Identifier: Apache-2.0
 ## v2.9.0 - TBD
 
 Changes:
+- Added `ntp_server_info` metric to report the `reference_id` label.
 
 ## v2.8.0 - 2024-12-11
 

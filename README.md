@@ -23,6 +23,7 @@ These are the metrics supported.
 - `ntp_precision_seconds`
 - `ntp_leap`
 - `ntp_scrape_duration_seconds`
+- `ntp_server_info` (labels: `server`, `reference_id`)
 - `ntp_server_reachable`
 
 As an alternative to [the node-exporter's `time` module](https://github.com/prometheus/node_exporter/blob/master/docs/TIME.md), this exporter does not require an NTP component on localhost that it can talk to. We only look at the system clock and talk to the configured NTP server(s).

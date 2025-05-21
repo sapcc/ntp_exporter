@@ -9,6 +9,7 @@ import (
 	"log"
 	"math"
 	"sort"
+	"strconv"
 	"time"
 
 	"github.com/beevik/ntp"
@@ -82,6 +83,11 @@ func CollectorInitial(target string, protocol int, duration, highDrift time.Dura
 			Name:      "server_reachable",
 			Help:      "True if the NTP server is reachable by the NTP exporter.",
 		}, []string{"server"}),
+		serverInfo: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Namespace: "ntp",
+			Name:      "server_info",
+			Help:      "Information about the NTP server.",
+		}, []string{"server", "reference_id"}),
 	}
 }
 
@@ -103,6 +109,7 @@ type Collector struct {
 	leap                   *prometheus.GaugeVec
 	scrapeDuration         prometheus.Summary
 	serverReachable        *prometheus.GaugeVec
+	serverInfo             *prometheus.GaugeVec
 }
 
 // A single measurement returned by ntp server
@@ -116,6 +123,7 @@ type Measurement struct {
 	rootDistance   float64
 	precision      float64
 	leap           float64
+	referenceID    uint32
 }
 
 // Describe implements the prometheus.Collector interface.
@@ -132,6 +140,7 @@ func (c Collector) Describe(ch chan<- *prometheus.Desc) {
 	c.leap.Describe(ch)
 	c.scrapeDuration.Describe(ch)
 	c.serverReachable.Describe(ch)
+	c.serverInfo.Describe(ch)
 }
 
 // Collect implements the prometheus.Collector interface.
@@ -153,6 +162,7 @@ func (c Collector) Collect(ch chan<- prometheus.Metric) {
 		c.precision.Collect(ch)
 		c.leap.Collect(ch)
 		c.scrapeDuration.Collect(ch)
+		c.serverInfo.Collect(ch)
 	} else {
 		log.Println("ERROR:", err)
 		return
@@ -222,6 +232,7 @@ func (c Collector) measure() error {
 	c.precision.WithLabelValues(c.NtpServer).Set(measurement.precision)
 	c.leap.WithLabelValues(c.NtpServer).Set(measurement.leap)
 	c.serverReachable.WithLabelValues(c.NtpServer).Set(1)
+	c.serverInfo.WithLabelValues(c.NtpServer, strconv.FormatUint(uint64(measurement.referenceID), 10)).Set(1)
 
 	c.scrapeDuration.Observe(time.Since(begin).Seconds())
 	return nil
@@ -242,6 +253,7 @@ func (c Collector) getClockOffsetAndStratum() (measurement Measurement, err erro
 	measurement.rootDistance = resp.RootDistance.Seconds()
 	measurement.precision = resp.Precision.Seconds()
 	measurement.leap = float64(resp.Leap)
+	measurement.referenceID = resp.ReferenceID // Get ntp server label info
 	return measurement, nil
 }
 
