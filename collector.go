@@ -87,7 +87,7 @@ func CollectorInitial(target string, protocol int, duration, highDrift time.Dura
 			Namespace: "ntp",
 			Name:      "server_info",
 			Help:      "Information about the NTP server.",
-		}, []string{"server", "referenceID"}),
+		}, []string{"server", "reference_id"}),
 	}
 }
 
