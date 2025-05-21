@@ -9,6 +9,7 @@ import (
 	"log"
 	"math"
 	"sort"
+	"strconv"
 	"time"
 
 	"github.com/beevik/ntp"
@@ -231,7 +232,7 @@ func (c Collector) measure() error {
 	c.precision.WithLabelValues(c.NtpServer).Set(measurement.precision)
 	c.leap.WithLabelValues(c.NtpServer).Set(measurement.leap)
 	c.serverReachable.WithLabelValues(c.NtpServer).Set(1)
-	c.serverInfo.WithLabelValues(c.NtpServer, fmt.Sprintf("%d", measurement.referenceID)).Set(1)
+	c.serverInfo.WithLabelValues(c.NtpServer, strconv.FormatUint(uint64(measurement.referenceID), 10)).Set(1)
 
 	c.scrapeDuration.Observe(time.Since(begin).Seconds())
 	return nil
