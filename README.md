@@ -37,11 +37,11 @@ installed with `go get`:
 go install github.com/sapcc/ntp_exporter@latest
 ```
 
-We also publish pre-built images on Docker Hub as
-[sapcc/ntp-exporter](https://hub.docker.com/r/sapcc/ntp-exporter):
+We also publish pre-built images on ghcr.io as
+[sapcc/ntp_exporter](https://github.com/sapcc/ntp_exporter/pkgs/container/ntp_exporter):
 
 ```bash
-docker pull ghcr.io/sapcc/ntp_exporter:v2.2.0
+docker pull ghcr.io/sapcc/ntp_exporter:v2.8.0
 ```
 
 ## Usage
