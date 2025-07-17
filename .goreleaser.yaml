@@ -7,7 +7,7 @@ archives:
   - name_template: '{{ .ProjectName }}-{{ replace .Version "v" "" }}-{{ .Os }}-{{ .Arch }}'
     format_overrides:
       - goos: windows
-        format: zip
+        formats: [ zip ]
     files:
       - CHANGELOG.md
       - LICENSE
