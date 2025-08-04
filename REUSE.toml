@@ -173,6 +173,14 @@ SPDX-License-Identifier = "MIT"
 
 [[annotations]]
 path = [
+  "vendor/go.uber.org/goleak/**",
+]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "Other"
+SPDX-License-Identifier = "MIT"
+
+[[annotations]]
+path = [
   "vendor/golang.org/x/net/**",
 ]
 precedence = "aggregate"
