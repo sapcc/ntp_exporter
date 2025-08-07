@@ -6,7 +6,7 @@ require (
 	github.com/beevik/ntp v1.4.3
 	github.com/prometheus/client_golang v1.23.0
 	github.com/sapcc/go-api-declarations v1.17.2
-	github.com/sapcc/go-bits v0.0.0-20250804090407-8c55156bef1d
+	github.com/sapcc/go-bits v0.0.0-20250807112417-2f28a08d3ddd
 	go.uber.org/automaxprocs v1.6.0
 )
 
