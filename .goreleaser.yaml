@@ -13,9 +13,6 @@ archives:
       - LICENSE
       - README.md
 
-checksum:
-  name_template: "checksums.txt"
-
 builds:
   - binary: 'ntp_exporter'
     env:
@@ -40,9 +37,16 @@ builds:
     # Set the modified timestamp on the output binary to ensure that builds are reproducible.
     mod_timestamp: "{{ .CommitTimestamp }}"
 
+checksum:
+  name_template: "checksums.txt"
+
 release:
   make_latest: true
   prerelease: auto
+
+sboms:
+  - id: archive
+    artifacts: archive
 
 snapshot:
   version_template: "{{ .Tag }}-next"

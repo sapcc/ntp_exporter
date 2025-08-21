@@ -14,6 +14,7 @@ mkShell {
     goreleaser
     gotools # goimports
     reuse
+    syft
     # keep this line if you use bash
     bashInteractive
   ];
