@@ -147,11 +147,11 @@ func (c Collector) Describe(ch chan<- *prometheus.Desc) {
 func (c Collector) Collect(ch chan<- prometheus.Metric) {
 	err := c.measure()
 
+	c.buildInfo.Collect(ch)
 	c.serverReachable.Collect(ch)
 
 	// only report data when measurement was successful
 	if err == nil {
-		c.buildInfo.Collect(ch)
 		c.drift.Collect(ch)
 		c.stratum.Collect(ch)
 		c.rtt.Collect(ch)
