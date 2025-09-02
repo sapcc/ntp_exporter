@@ -3,10 +3,15 @@ SPDX-FileCopyrightText: 2025 SAP SE or an SAP affiliate company
 SPDX-License-Identifier: Apache-2.0
 -->
 
-## v2.9.0 - TBD
+## v2.10.0 - TBD
+
+Changes:
+
+## v2.9.0 - 2025-09-02
 
 Changes:
 - Added `ntp_server_info` metric to report the `reference_id` label.
+- Updated all go dependencies to their latest versions.
 
 ## v2.8.0 - 2024-12-11
 
