@@ -27,7 +27,7 @@ jobs:
         uses: actions/setup-go@v6
         with:
           check-latest: true
-          go-version: 1.24.7
+          go-version: 1.25.1
       - name: Install syft
         uses: anchore/sbom-action/download-syft@v0
       - name: Generate release info
