@@ -13,6 +13,7 @@ mkShell {
     golangci-lint
     goreleaser
     gotools # goimports
+    renovate
     reuse
     syft
     # keep this line if you use bash
