@@ -1,5 +1,5 @@
-# github.com/beevik/ntp v1.4.3
-## explicit; go 1.17
+# github.com/beevik/ntp v1.5.0
+## explicit; go 1.24.0
 github.com/beevik/ntp
 # github.com/beorn7/perks v1.0.1
 ## explicit; go 1.11
