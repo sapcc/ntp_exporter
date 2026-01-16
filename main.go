@@ -19,7 +19,6 @@ import (
 	"github.com/sapcc/go-api-declarations/bininfo"
 	"github.com/sapcc/go-bits/httpext"
 	"github.com/sapcc/go-bits/must"
-	_ "go.uber.org/automaxprocs"
 )
 
 var (
