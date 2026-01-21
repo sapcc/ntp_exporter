@@ -44,6 +44,13 @@ We also publish pre-built images on ghcr.io as
 docker pull ghcr.io/sapcc/ntp_exporter:v2.8.0
 ```
 
+There is a community maintained Helm Chart available at [ArtifactHub](https://artifacthub.io/packages/helm/christianhuth/ntp-exporter).
+
+```bash
+helm repo add christianhuth https://charts.christianhuth.de
+helm install ntp-exporter --set ntp.server=de.pool.ntp.org christianhuth/ntp-exporter
+```
+
 ## Usage
 
 Common command-line options:
