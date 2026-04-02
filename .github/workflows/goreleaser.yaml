@@ -38,7 +38,7 @@ jobs:
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v7
         with:
-          args: release --clean --release-notes=./build/release-info
+          args: release --clean --release-notes=./build/release-info --parallelism=$(($(nproc)/2))
           version: latest
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
