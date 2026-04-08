@@ -6,7 +6,7 @@ require (
 	github.com/beevik/ntp v1.5.0
 	github.com/prometheus/client_golang v1.23.2
 	github.com/sapcc/go-api-declarations v1.21.0
-	github.com/sapcc/go-bits v0.0.0-20260402121530-dccf194c4472
+	github.com/sapcc/go-bits v0.0.0-20260407070756-5fae59f97b19
 )
 
 require (
