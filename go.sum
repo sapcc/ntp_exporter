@@ -33,8 +33,8 @@ github.com/rogpeppe/go-internal v1.10.0 h1:TMyTOH3F/DB16zRVcYyreMH6GnZZrwQVAoYjR
 github.com/rogpeppe/go-internal v1.10.0/go.mod h1:UQnix2H7Ngw/k4C5ijL5+65zddjncjaFoBhdsK/akog=
 github.com/sapcc/go-api-declarations v1.21.0 h1:Ag6GXgJLTFdBDKmrJU4QFllQbgGSenSGeHpLuvuxeDk=
 github.com/sapcc/go-api-declarations v1.21.0/go.mod h1:eiRrXXUeQS5C/1kKn8/KMjk0Y0goUzgDQswj30rH0Zc=
-github.com/sapcc/go-bits v0.0.0-20260408114239-ecd3902a31cc h1:A2rhBoRbMOug1MUPikQglrOxbNFFWAva2MqLKzWfEf4=
-github.com/sapcc/go-bits v0.0.0-20260408114239-ecd3902a31cc/go.mod h1:kwa5XaR9PW7W0oqcaHIZ3yHvkgYJyHmYMX7MwcewSLM=
+github.com/sapcc/go-bits v0.0.0-20260409170436-d7b7822ab7d3 h1:x6loYoCC8+gP+51y4kSzF0bmHsp8UxBfjkU25f1/jUM=
+github.com/sapcc/go-bits v0.0.0-20260409170436-d7b7822ab7d3/go.mod h1:o1ld51gRnKbNYTUtx5czsuO8zczc9/iGkEjcwDQb9wA=
 github.com/sergi/go-diff v1.4.0 h1:n/SP9D5ad1fORl+llWyN+D6qoUETXNZARKjyY2/KVCw=
 github.com/sergi/go-diff v1.4.0/go.mod h1:A0bzQcvG0E7Rwjx0REVgAGH58e96+X0MeOfepqsbeW4=
 github.com/stretchr/testify v1.11.1 h1:7s2iGBzp5EwR7/aIZr8ao5+dra3wiQyKjjFuvgVKu7U=
