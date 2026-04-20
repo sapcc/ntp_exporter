@@ -63,6 +63,7 @@ linters:
     - perfsprint
     - predeclared
     - rowserrcheck
+    - revive
     - sqlclosecheck
     - staticcheck
     - unconvert
@@ -161,11 +162,18 @@ linters:
     perfsprint:
       # modernize generates nicer fix code
       concat-loop: false
+    revive:
+      rules:
+        - name: exported
+          arguments:
+            - checkPrivateReceivers
+            - disableChecksOnConstants
     staticcheck:
       dot-import-whitelist:
         - github.com/majewsky/gg/option
         - github.com/onsi/ginkgo/v2
         - github.com/onsi/gomega
+        - go.xyrillian.de/gg/option
     usestdlibvars:
       http-method: true
       http-status-code: true
