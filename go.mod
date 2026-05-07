@@ -5,8 +5,8 @@ go 1.26
 require (
 	github.com/beevik/ntp v1.5.0
 	github.com/prometheus/client_golang v1.23.2
-	github.com/sapcc/go-api-declarations v1.21.0
-	github.com/sapcc/go-bits v0.0.0-20260423021225-fb5e4523b6c5
+	github.com/sapcc/go-api-declarations v1.22.0
+	github.com/sapcc/go-bits v0.0.0-20260507090738-58bd3afe1717
 )
 
 require (
