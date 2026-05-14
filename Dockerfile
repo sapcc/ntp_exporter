@@ -1,13 +1,14 @@
 # SPDX-FileCopyrightText: 2025 SAP SE or an SAP affiliate company
 # SPDX-License-Identifier: Apache-2.0
 
-FROM golang:1.26.3-alpine3.23 AS builder
+FROM --platform=$BUILDPLATFORM golang:1.26.3-alpine3.23 AS builder
 
-RUN apk add --no-cache --no-progress ca-certificates gcc git make musl-dev
+RUN apk add --no-cache --no-progress ca-certificates git make
 
 COPY . /src
 ARG BININFO_BUILD_DATE BININFO_COMMIT_HASH BININFO_VERSION # provided to 'make install'
-RUN make -C /src install PREFIX=/pkg GOTOOLCHAIN=local GO_BUILDFLAGS='-mod vendor'
+ARG TARGETOS TARGETARCH
+RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH make -C /src install PREFIX=/pkg GOTOOLCHAIN=local GO_BUILDFLAGS='-mod vendor'
 
 ################################################################################
 
