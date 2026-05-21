@@ -8,6 +8,10 @@ RUN apk add --no-cache --no-progress ca-certificates git make
 COPY . /src
 ARG BININFO_BUILD_DATE BININFO_COMMIT_HASH BININFO_VERSION # provided to 'make install'
 ARG TARGETOS TARGETARCH
+RUN if [ -z "$TARGETOS" ] || [ -z "$TARGETARCH" ]; then \
+      echo 'This image must be built with BuildKit (otherwise the required variables $TARGETOS and $TARGETARCH will not be present). If you cannot enable BuildKit, pass them explicitly via --build-arg.' >&2; \
+      exit 1; \
+    fi
 RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH make -C /src install PREFIX=/pkg GOTOOLCHAIN=local GO_BUILDFLAGS='-mod vendor'
 
 ################################################################################
@@ -40,7 +44,7 @@ RUN make -C /src static-check
 RUN chown -R 4200:4200 /src/ /go/
 USER 4200:4200
 RUN cd /src \
-  && git config --global --add safe.directory /src \
+  && { if test -d .git; then git config --global --add safe.directory /src; fi; } \
   && make build/cover.out
 
 ################################################################################
