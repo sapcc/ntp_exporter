@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: 2025 SAP SE or an SAP affiliate company
 # SPDX-License-Identifier: Apache-2.0
 
-FROM --platform=$BUILDPLATFORM golang:1.26.3-alpine3.23 AS builder
+FROM --platform=$BUILDPLATFORM golang:1.26.4-alpine3.23 AS builder
 
 RUN apk add --no-cache --no-progress ca-certificates git make
 
@@ -19,7 +19,7 @@ RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH make -C /src install PREFIX=
 # To only build the tests run: docker build . --target test
 # We can't do `FROM builder AS test` here, as then make prepare-static-check would not be cached during interactive use when developing
 # and caching all the tools, especially golangci-lint, takes a few minutes.
-FROM golang:1.26.3-alpine3.23 AS test
+FROM golang:1.26.4-alpine3.23 AS test
 
 COPY Makefile /src/Makefile
 
@@ -46,7 +46,6 @@ USER 4200:4200
 RUN cd /src \
   && { if test -d .git; then git config --global --add safe.directory /src; fi; } \
   && make build/cover.out
-
 ################################################################################
 
 FROM alpine:3.23
