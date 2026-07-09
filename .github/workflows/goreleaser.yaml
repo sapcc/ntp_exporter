@@ -11,23 +11,32 @@ name: goreleaser
   push:
     tags:
       - '*'
+  pull_request:
+    branches:
+      - master
+    types:
+      - closed
 permissions:
   contents: write
   packages: write
 jobs:
   release:
     name: goreleaser
+    if: always() && (github.event_name == 'push' || needs.tag.result == 'success')
+    needs:
+      - tag
     runs-on: ubuntu-latest
     steps:
       - name: Check out code
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           fetch-depth: 0
+          ref: ${{ github.event_name == 'pull_request' && format('refs/tags/v{0}', needs.tag.outputs.version) || github.ref }}
       - name: Set up Go
         uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           check-latest: true
-          go-version: 1.26.4
+          go-version: 1.26.5
       - name: Install syft
         uses: anchore/sbom-action/download-syft@e22c389904149dbc22b58101806040fa8d37a610 # v0
       - name: Generate release info
@@ -42,3 +51,32 @@ jobs:
           version: latest
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  tag:
+    name: tag
+    if: github.event_name == 'pull_request' && github.event.pull_request.merged == true && github.event.pull_request.head.ref == 'chore/release-next'
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Check out code
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          fetch-depth: 0
+      - name: Read version from CHANGELOG
+        id: version
+        uses: release-flow/keep-a-changelog-action@74931dec7ecdbfc8e38ac9ae7e8dd84c08db2f32 # v3.0.0
+        with:
+          command: query
+          version: latest
+      - name: Create and push tag
+        env:
+          VERSION: v${{ steps.version.outputs.version }}
+        run: |
+          if git rev-parse "${VERSION}" >/dev/null 2>&1; then
+            echo "Tag ${VERSION} already exists, skipping"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "${VERSION}" -m "Release ${VERSION}"
+          git push origin "${VERSION}"
