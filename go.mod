@@ -1,12 +1,12 @@
 module github.com/sapcc/ntp_exporter
 
-go 1.26
+go 1.27
 
 require (
 	github.com/beevik/ntp v1.5.0
 	github.com/prometheus/client_golang v1.24.1
 	github.com/sapcc/go-api-declarations v1.25.0
-	github.com/sapcc/go-bits v0.0.0-20260818140528-75bdd20c7867
+	github.com/sapcc/go-bits v0.0.0-20260827091731-7669cbdb53fb
 )
 
 require (
