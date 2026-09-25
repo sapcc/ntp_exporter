@@ -1,4 +1,4 @@
-// Copyright © 2015-2023 Brett Vickers.
+// Copyright © Brett Vickers.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
@@ -14,18 +14,21 @@ import (
 	"bytes"
 	"crypto/rand"
 	"encoding/binary"
+	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
+	"math"
 	"net"
 	"strconv"
 	"strings"
 	"time"
-
-	"golang.org/x/net/ipv4"
 )
 
 var (
-	ErrAuthFailed             = errors.New("authentication failed")
+	ErrAuthFailed             = errors.New("authentication MAC verification failed")
+	ErrAuthNAK                = errors.New("authentication NAK received")
+	ErrExtensionsNotSupported = errors.New("NTPV3 does not support extension fields")
 	ErrInvalidAuthKey         = errors.New("invalid authentication key")
 	ErrInvalidDispersion      = errors.New("invalid dispersion in response")
 	ErrInvalidLeapSecond      = errors.New("invalid leap second in response")
@@ -36,8 +39,33 @@ var (
 	ErrInvalidTransmitTime    = errors.New("invalid transmit time in response")
 	ErrKissOfDeath            = errors.New("kiss of death received")
 	ErrServerClockFreshness   = errors.New("server clock not fresh")
+	ErrServerNotSynchronized  = errors.New("NTPv5 server not synchronized")
 	ErrServerResponseMismatch = errors.New("server response didn't match request")
 	ErrServerTickedBackwards  = errors.New("server clock ticked backwards")
+)
+
+// Internal constants
+const (
+	// Protocol constants
+	defaultVersion  = 4
+	defaultPort     = 123
+	defaultTimeout  = 5 * time.Second
+	maxDispersion   = 16 * time.Second
+	maxPollInterval = (1 << 17) * time.Second
+	maxStratum      = 16
+	msgSize         = 48
+
+	// Time constants
+	nanoPerSec = 1_000_000_000
+	timeFormat = "Mon Jan _2 2006  15:04:05.00000000 (MST)"
+
+	// Fixed-point constants (Q*.16, Q*.28, Q*.32)
+	mask16 = (1 << 16) - 1     // 0x0000ffff
+	mask28 = (1 << 28) - 1     // 0x0fffffff
+	mask32 = (1 << 32) - 1     // 0xffffffff
+	half16 = (mask16 >> 1) + 1 // 0x00008000
+	half28 = (mask28 >> 1) + 1 // 0x08000000
+	half32 = (mask32 >> 1) + 1 // 0x80000000
 )
 
 // The LeapIndicator is used to warn if a leap second should be inserted
@@ -45,166 +73,40 @@ var (
 type LeapIndicator uint8
 
 const (
-	// LeapNoWarning indicates no impending leap second.
-	LeapNoWarning LeapIndicator = 0
+	// LeapNoWarning indicates that no leap second will be inserted in the
+	// near future (within the next 14 days for NTPv5). It is also used when
+	// responding to an NTPv5 leap-smeared timescale request.
+	LeapNoWarning LeapIndicator = 0 + iota
 
-	// LeapAddSecond indicates the last minute of the day has 61 seconds.
-	LeapAddSecond = 1
+	// LeapAddSecond indicates that, in the near future (within 14 days for
+	// NTPv5), a leap second will be inserted at the end of the current month.
+	LeapAddSecond
 
-	// LeapDelSecond indicates the last minute of the day has 59 seconds.
-	LeapDelSecond = 2
+	// LeapDelSecond indicates that, in the near future (within 14 days for
+	// NTPv5), a leap second will be deleted at the end of the current month.
+	LeapDelSecond
 
-	// LeapNotInSync indicates an unsynchronized leap second.
-	LeapNotInSync = 3
+	// LeapNotInSync indicates that the server has no time source or other
+	// source providing information about leap seconds (often due to an
+	// unsynchronized server clock).
+	LeapNotInSync
 )
-
-// Internal constants
-const (
-	defaultNtpVersion = 4
-	defaultNtpPort    = 123
-	nanoPerSec        = 1000000000
-	maxStratum        = 16
-	defaultTimeout    = 5 * time.Second
-	maxPollInterval   = (1 << 17) * time.Second
-	maxDispersion     = 16 * time.Second
-)
-
-// Internal variables
-var (
-	ntpEra0 = time.Date(1900, 1, 1, 0, 0, 0, 0, time.UTC)
-	ntpEra1 = time.Date(2036, 2, 7, 6, 28, 16, 0, time.UTC)
-)
-
-type mode uint8
-
-// NTP modes. This package uses only client mode.
-const (
-	reserved mode = 0 + iota
-	symmetricActive
-	symmetricPassive
-	client
-	server
-	broadcast
-	controlMessage
-	reservedPrivate
-)
-
-// An ntpTime is a 64-bit fixed-point (Q32.32) representation of the number of
-// seconds elapsed.
-type ntpTime uint64
-
-// Duration interprets the fixed-point ntpTime as a number of elapsed seconds
-// and returns the corresponding time.Duration value.
-func (t ntpTime) Duration() time.Duration {
-	sec := (t >> 32) * nanoPerSec
-	frac := (t & 0xffffffff) * nanoPerSec
-	nsec := frac >> 32
-	if uint32(frac) >= 0x80000000 {
-		nsec++
-	}
-	return time.Duration(sec + nsec)
-}
-
-// Time interprets the fixed-point ntpTime as an absolute time and returns
-// the corresponding time.Time value.
-func (t ntpTime) Time() time.Time {
-	// Assume NTP era 1 (year 2036+) if the raw timestamp suggests a year
-	// before 1970. Otherwise assume NTP era 0. This allows the function to
-	// report an accurate time value both before and after the 0-to-1 era
-	// rollover.
-	const t1970 = 0x83aa7e8000000000
-	if uint64(t) < t1970 {
-		return ntpEra1.Add(t.Duration())
-	}
-	return ntpEra0.Add(t.Duration())
-}
-
-// toNtpTime converts the time.Time value t into its 64-bit fixed-point
-// ntpTime representation.
-func toNtpTime(t time.Time) ntpTime {
-	nsec := uint64(t.Sub(ntpEra0))
-	sec := nsec / nanoPerSec
-	nsec = uint64(nsec-sec*nanoPerSec) << 32
-	frac := uint64(nsec / nanoPerSec)
-	if nsec%nanoPerSec >= nanoPerSec/2 {
-		frac++
-	}
-	return ntpTime(sec<<32 | frac)
-}
-
-// An ntpTimeShort is a 32-bit fixed-point (Q16.16) representation of the
-// number of seconds elapsed.
-type ntpTimeShort uint32
-
-// Duration interprets the fixed-point ntpTimeShort as a number of elapsed
-// seconds and returns the corresponding time.Duration value.
-func (t ntpTimeShort) Duration() time.Duration {
-	sec := uint64(t>>16) * nanoPerSec
-	frac := uint64(t&0xffff) * nanoPerSec
-	nsec := frac >> 16
-	if uint16(frac) >= 0x8000 {
-		nsec++
-	}
-	return time.Duration(sec + nsec)
-}
-
-// header is an internal representation of an NTP packet header.
-type header struct {
-	LiVnMode       uint8 // Leap Indicator (2) + Version (3) + Mode (3)
-	Stratum        uint8
-	Poll           int8
-	Precision      int8
-	RootDelay      ntpTimeShort
-	RootDispersion ntpTimeShort
-	ReferenceID    uint32 // KoD code if Stratum == 0
-	ReferenceTime  ntpTime
-	OriginTime     ntpTime
-	ReceiveTime    ntpTime
-	TransmitTime   ntpTime
-}
-
-// setVersion sets the NTP protocol version on the header.
-func (h *header) setVersion(v int) {
-	h.LiVnMode = (h.LiVnMode & 0xc7) | uint8(v)<<3
-}
-
-// setMode sets the NTP protocol mode on the header.
-func (h *header) setMode(md mode) {
-	h.LiVnMode = (h.LiVnMode & 0xf8) | uint8(md)
-}
-
-// setLeap modifies the leap indicator on the header.
-func (h *header) setLeap(li LeapIndicator) {
-	h.LiVnMode = (h.LiVnMode & 0x3f) | uint8(li)<<6
-}
-
-// getVersion returns the version value in the header.
-func (h *header) getVersion() int {
-	return int((h.LiVnMode >> 3) & 0x7)
-}
-
-// getMode returns the mode value in the header.
-func (h *header) getMode() mode {
-	return mode(h.LiVnMode & 0x07)
-}
-
-// getLeap returns the leap indicator on the header.
-func (h *header) getLeap() LeapIndicator {
-	return LeapIndicator((h.LiVnMode >> 6) & 0x03)
-}
 
 // An Extension adds custom behaviors capable of modifying NTP packets before
 // being sent to the server and processing packets after being received by the
 // server.
 type Extension interface {
 	// ProcessQuery is called when the client is about to send a query to the
-	// NTP server. The buffer contains the NTP header. It may also contain
-	// extension fields added by extensions processed prior to this one.
+	// NTP server. The buffer contains the NTP message and any extension
+	// fields generated by this package (excluding the NTPv5 MAC and
+	// correction extension fields). It may also contain extension fields
+	// added by other extensions processed prior to this one.
 	ProcessQuery(buf *bytes.Buffer) error
 
 	// ProcessResponse is called after the client has received the server's
 	// NTP response. The buffer contains the entire message returned by the
-	// server.
+	// server. It is owned by the package and is valid only for the duration
+	// of the call.
 	ProcessResponse(buf []byte) error
 }
 
@@ -215,7 +117,13 @@ type QueryOptions struct {
 	// server before failing with a timeout error. Defaults to 5 seconds.
 	Timeout time.Duration
 
-	// Version of the NTP protocol to use. Defaults to 4.
+	// Version of the NTP protocol to use. Defaults to 4. Allowed values
+	// include 3, 4, and 5.
+	//
+	// The IETF has not finalized version 5 of the NTP protocol, so version 5
+	// support is considered experimental and should not be used in
+	// production. This package currently supports only NTPv5 draft version
+	// "draft-ietf-ntp-ntpv5-09".
 	Version int
 
 	// LocalAddress contains the local IP address to use when creating a
@@ -228,40 +136,111 @@ type QueryOptions struct {
 	// is dropped by the network. Defaults to the local system's default value.
 	TTL int
 
-	// Auth contains the settings used to configure NTP symmetric key
-	// authentication. See RFC 5905 for further details.
+	// Timescale is used to request timestamps from the server that are
+	// measured according to a specific timescale reference (UTC, TAI, UT1, or
+	// leap-smeared UTC). Defaults to TimescaleUTC. Used only in NTPv5.
+	Timescale Timescale
+
+	// AdditionalTimescales requests additional timestamps using the specified
+	// timescales, allowing the client to determine the offsets between the
+	// primary timescale (specified in the Timescale field) and each of the
+	// additional timescales. If the server supports this feature, offsets
+	// will be reported in the response's TimescaleOffsets field. Used only in
+	// NTPv5.
+	AdditionalTimescales []Timescale
+
+	// ServerCookie contains the server cookie returned by a prior server
+	// response when operating in interleaved mode. Used only in NTPv5.
+	ServerCookie uint64
+
+	// Auth contains the options used to configure symmetric key
+	// authentication. See RFC 5905 for further details. For NTPv3 and NTPv4,
+	// this results in a MAC or digest being appended to the end of the NTP
+	// message. For NTPv5, this results in a message authentication extension
+	// field being added to the NTP message. Defaults to no symmetric key
+	// authentication.
 	Auth AuthOptions
 
-	// Extensions may be added to modify NTP queries before they are
-	// transmitted and to process NTP responses after they arrive.
+	// Extensions may be provided in order to (a) modify NTP queries before
+	// they are transmitted and (b) process NTP responses after they arrive.
+	// When building an NTP request, these extensions are processed in the
+	// order listed. When processing a server response, they are processed in
+	// reverse order. An example of an extension is one that implements
+	// Network Time Security (NTS). See: https://github.com/beevik/nts.
 	Extensions []Extension
 
 	// GetSystemTime is a callback used to override the default method of
 	// obtaining the local system time during time synchronization. If not
-	// specified, time.Now is used.
+	// specified, the most precise system clock offered by the platform is
+	// used. Specifying this callback disables the use of kernel timestamps
+	// on platforms that would otherwise support them.
 	GetSystemTime func() time.Time
+
+	// RequestReferenceID is a struct used to request reference ID bloom
+	// filter values, which are returned in the ReferenceIDFilterValues field
+	// of the response. Used only in NTPv5.
+	RequestReferenceID ReferenceIDRequest
+
+	// RequestSupportedVersions indicates whether to request the versions of
+	// the NTP protocol supported by the server. When used with NTPv5, the
+	// response will list all supported versions. When used with NTPv3 or
+	// NTPv4, the response's ReferenceTime value will be invalid, and the
+	// supported version list will include the version used in the query as
+	// well as 5 if the server supports it.
+	RequestSupportedVersions bool
+
+	// RequestCorrection indicates whether to request delay corrections from
+	// network switches and routers along the path between the client and the
+	// server. If available, such delay corrections will be applied to the
+	// response's ClockOffset, making it more accurate. Used only in NTPv5.
+	RequestCorrection bool
+
+	// RequestReferenceTime indicates whether to request that the server
+	// include a reference timestamp in its response. Used only in NTPv5.
+	RequestReferenceTime bool
+
+	// RequestMonotonic indicates whether to request a second receive
+	// timestamp from the server using an independent monotonic clock without
+	// phase correction. This second timestamp is intended to be used by the
+	// client to reduce clock drift by adjusting the frequency of its local
+	// system clock. Used only in NTPv5.
+	RequestMonotonic bool
+
+	// RequestInterleavedMode indicates whether to use interleaved mode for
+	// the NTPv5 query. Used in conjunction with the ServerCookie field. Used
+	// only in NTPv5.
+	RequestInterleavedMode bool
 
 	// Dialer is a callback used to override the default UDP network dialer.
 	// The localAddress is directly copied from the LocalAddress field
 	// specified in QueryOptions. It may be the empty string or a host address
 	// (without port number). The remoteAddress is the "host:port" string
-	// derived from the first parameter to QueryWithOptions.  The
-	// remoteAddress is guaranteed to include a port number.
+	// derived from the first parameter to QueryWithOptions. The remoteAddress
+	// is guaranteed to include a port number.
 	Dialer func(localAddress, remoteAddress string) (net.Conn, error)
 
-	// Dial is a callback used to override the default UDP network dialer.
-	//
 	// DEPRECATED. Use Dialer instead.
 	Dial func(laddr string, lport int, raddr string, rport int) (net.Conn, error)
 
-	// Port indicates the port used to reach the remote NTP server.
-	//
 	// DEPRECATED. Embed the port number in the query address string instead.
 	Port int
 }
 
+// The ReferenceIDRequest struct is included in QueryOptions to request a
+// chunk of reference ID bloom filter values. Used only in NTPv5. See IETF
+// draft-ietf-ntp-ntpv5 section 7.4 for futher details.
+type ReferenceIDRequest struct {
+	// The octet offset of the reference ID filter chunk to request. Must be
+	// less than or equal to 512.
+	ChunkOffset uint16
+
+	// The number of octets in the requested reference ID filter chunk. The
+	// sum of ChunkOffset and ChunkSize must be less than or equal to 512.
+	ChunkSize uint16
+}
+
 // A Response contains time data, some of which is returned by the NTP server
-// and some of which is calculated by this client.
+// and some of which is calculated by the client.
 type Response struct {
 	// ClockOffset is the estimated offset of the local system clock relative
 	// to the server's clock. Add this value to subsequent local system clock
@@ -269,39 +248,88 @@ type Response struct {
 	// clock.
 	ClockOffset time.Duration
 
-	// Time is the time the server transmitted this response, measured using
-	// its own clock. You should not use this value for time synchronization
-	// purposes. Add ClockOffset to your system clock instead.
-	Time time.Time
-
 	// RTT is the measured round-trip-time delay estimate between the client
 	// and the server.
 	RTT time.Duration
+
+	// Timestamps contains the four NTP protocol timestamps used to calculate
+	// ClockOffset and RTT.
+	Timestamps ProtocolTimestamps
 
 	// Precision is the reported precision of the server's clock.
 	Precision time.Duration
 
 	// Version is the NTP protocol version number reported by the server.
+	// Supported values include 3, 4, and 5.
 	Version int
 
 	// Stratum is the "stratum level" of the server. The smaller the number,
 	// the closer the server is to the reference clock. Stratum 1 servers are
-	// attached directly to the reference clock. A stratum value of 0
-	// indicates the "kiss of death," which typically occurs when the client
-	// issues too many requests to the server in a short period of time.
+	// attached directly to the reference clock. For NTPv3 and NTPv4, a
+	// stratum value of 0 indicates the "kiss of death," which typically
+	// occurs when the client issues too many requests to the server in a
+	// short period of time.
 	Stratum uint8
 
-	// ReferenceID is a 32-bit integer identifying the server or reference
-	// clock. For stratum 1 servers, this is typically a meaningful
-	// zero-padded ASCII-encoded string assigned to the clock. For stratum 2+
-	// servers, this is a reference identifier for the server and is either
-	// the server's IPv4 address or a hash of its IPv6 address. For
-	// kiss-of-death responses (stratum 0), this is the ASCII-encoded "kiss
-	// code".
+	// Timescale reports the timescale used by the server to timestamp
+	// messages it sent and received. Always TimescaleUTC for NTPv3 and NTPv4.
+	Timescale Timescale
+
+	// TimescaleOffsets contains the time offsets of any requested additional
+	// timescales relative to the primary timescale. Used only in NTPv5.
+	TimescaleOffsets []TimescaleOffset
+
+	// Era is the NTP era number returned by the server. Era 0 spans
+	// 1900-2036, Era 1 spans 2036-2172, etc.
+	Era uint8
+
+	// ReferenceID is a 32-bit integer used to help identify which server or
+	// reference clock generated the reported time. For stratum 1 servers,
+	// this is typically a meaningful zero-padded ASCII-encoded string
+	// assigned to the clock. For stratum 2+ servers, this is a reference
+	// identifier for the server and is either the server's IPv4 address or a
+	// hash of its IPv6 address. For kiss-of-death responses (stratum 0), this
+	// is the ASCII-encoded "kiss code". Used only in NTPv3 and NTPv4.
 	ReferenceID uint32
 
-	// ReferenceTime is the time the server last updated its local clock.
+	// ReferenceIDFilterValues contains the requested chunk of reference ID
+	// bloom filter values. The size and offset of this chunk are determined
+	// by the ReferenceIDRequest field in QueryOptions. Used only in NTPv5.
+	ReferenceIDFilterValues []byte
+
+	// ReferenceTime is the time the server last updated its local clock. In
+	// NTPv3 and NTPv4, this value is always returned by the server. In NTPv5,
+	// it is returned only when requested via the RequestReferenceTime field
+	// in QueryOptions.
 	ReferenceTime time.Time
+
+	// MonotonicOffset contains the offset of the server's monotonic clock
+	// relative to its primary clock. It is calculated by taking the
+	// difference between the monotonic receive timestamp and the primary
+	// receive timestamp contained in the response packet. Returned only when
+	// requested via the RequestMonotonic field in QueryOptions. Used only in
+	// NTPv5.
+	MonotonicOffset time.Duration
+
+	// MonotonicEpochID is the an identifier associated with the
+	// MonotonicOffset value. Whenever this value changes, the server's
+	// monotonic clock has been phase-corrected, and any frequency adjustment
+	// algorithms running on the client must be reset. Returned only when
+	// requested via the RequestMonotonic field in QueryOptions. Used only in
+	// NTPv5.
+	MonotonicEpochID uint32
+
+	// Correction contains delay correction information provided by network
+	// switches and routers along the path between the client and the server.
+	// Populated only when supported by the network equipment along the path
+	// and when requested via the QueryOptions RequestCorrection field. Used
+	// only in NTPv5.
+	Correction Correction
+
+	// SupportedVersions contains an array of NTP protocol version numbers
+	// supported by the server. Populated if requested by the
+	// RequestSupportedVersions field in QueryOptions. Used only in NTPv5.
+	SupportedVersions []int
 
 	// RootDelay is the server's estimated aggregate round-trip-time delay to
 	// the stratum 1 server.
@@ -319,31 +347,156 @@ type Response struct {
 	// the current month's last minute.
 	Leap LeapIndicator
 
-	// MinError is a lower bound on the error between the client and server
-	// clocks. When the client and server are not synchronized to the same
-	// clock, the reported timestamps may appear to violate the principle of
-	// causality. In other words, the NTP server's response may indicate
-	// that a message was received before it was sent. In such cases, the
-	// minimum error may be useful.
+	// MinError is a lower bound on the "causality violation" between the
+	// client and server clocks when they are not yet synchronized.
 	MinError time.Duration
 
-	// KissCode is a 4-character string describing the reason for a
-	// "kiss of death" response (stratum=0). For a list of standard kiss
-	// codes, see https://tools.ietf.org/html/rfc5905#section-7.4.
+	// KissCode is a 4-character string describing the reason for a "kiss of
+	// death" response (stratum=0). Used only in NTPv3 and NTPv4. For a list
+	// of standard kiss codes, see:
+	// https://tools.ietf.org/html/rfc5905#section-7.4.
 	KissCode string
 
 	// Poll is the maximum interval between successive NTP query messages to
 	// the server.
 	Poll time.Duration
 
+	// Flags reported by the server.
+	Flags ResponseFlags
+
+	// ServerCookie is the cookie returned by an NTPv5 server. In interleaved
+	// mode, this cookie should be passed to the server in the next query.
+	// Used only in NTPv5.
+	ServerCookie uint64
+
+	// DEPRECATED. Use Timestamps.ServerXmit instead.
+	Time time.Time
+
 	authErr error
 }
+
+// ProtocolTimestamps contains the four timestamps used by the NTP protocol to
+// calculate clock offset and round-trip delay.
+type ProtocolTimestamps struct {
+	// ClientXmit is the timestamp recorded by the client when it transmitted
+	// the request.
+	ClientXmit time.Time
+
+	// ServerRecv is the timestamp recorded by the server when it received the
+	// request.
+	ServerRecv time.Time
+
+	// ServerXmit is the timestamp recorded by the server when it transmitted
+	// the response.
+	ServerXmit time.Time
+
+	// ClientRecv is the timestamp recorded by the client when it received the
+	// response.
+	ClientRecv time.Time
+}
+
+// The TimescaleOffset struct contains a timescale identifier and its
+// corresponding offset relative to the primary timescale specified in the
+// QueryOptions Timescale field. Used only in NTPv5.
+type TimescaleOffset struct {
+	// The Timescale to which this offset pertains.
+	Timescale Timescale
+
+	// The offset of the timescale relative to the request's primary
+	// timescale. This value may be added to the response's ClockOffset to
+	// obtain a time synchronized to the associated timescale.
+	Offset time.Duration
+}
+
+// DelayUnrepresentable is a sentinel value used to indicate that a delay
+// correction value (i.e., OriginDelay or ReturnDelay) is not representable.
+// This occurs when a correction exceeds the maximum value representable by
+// NTP's correction timestamp format.
+var DelayUnrepresentable = time.Duration(math.MinInt64)
+
+// The Correction struct contains delay correction information provided by
+// network switches and routers along the path between the client and the
+// server. Used only in NTPv5.
+type Correction struct {
+	// OriginDelay is the total delay correction accumulated by the request
+	// packet on its way from the originating client to the server.
+	OriginDelay time.Duration
+
+	// OriginPathID is the path identifier calculated by intermediate nodes on
+	// the request packet's path from the originating client to the server.
+	OriginPathID uint16
+
+	// ReturnDelay is the total delay correction accumulated by the response
+	// packet on its return from the server to the client.
+	ReturnDelay time.Duration
+
+	// ReturnPathID is the path identifier calculated by intermediate nodes on
+	// the response packet's return from the server to the client. This may be
+	// compared to the OriginPathID to determine if the request and response
+	// packets traversed the same network path.
+	ReturnPathID uint16
+}
+
+// ResponseFlags are flag bits reported by an NTPv5 server in its response.
+type ResponseFlags uint32
+
+const (
+	// FlagSynchronized indicates whether the server is currently synchronized
+	// to a reference clock. For NTPv3 and NTPv4, this flag is set when the
+	// returned stratum is valid. For NTPv5, it is set only when the server
+	// explicitly indicates synchronization.
+	FlagSynchronized ResponseFlags = 1 << iota
+
+	// FlagInterleaved indicates whether the server reported its response in
+	// interleaved mode. Only used in NTPv5.
+	FlagInterleaved
+)
 
 // IsKissOfDeath returns true if the response is a "kiss of death" from the
 // remote server. If this function returns true, you may examine the
 // response's KissCode value to determine the reason for the kiss of death.
+// Valid only for NTPv3 and NTPv4.
 func (r *Response) IsKissOfDeath() bool {
-	return r.Stratum == 0
+	return r.Version < 5 && r.Stratum == 0
+}
+
+// Log outputs a human-readable representation of the NTP response to the
+// provided io.Writer. Meant for debugging purposes.
+func (r *Response) Log(w io.Writer) {
+	now := getSystemTime().Local()
+	fmt.Fprintf(w, "    Version: %d\n", r.Version)
+	fmt.Fprintf(w, "ClockOffset: %s\n", r.ClockOffset)
+	fmt.Fprintf(w, "        RTT: %s\n", r.RTT)
+	fmt.Fprintf(w, " SystemTime: %s\n", fmtTime(now))
+	fmt.Fprintf(w, "  ~TrueTime: %s\n", fmtTime(now.Add(r.ClockOffset)))
+	fmt.Fprintf(w, " ClientXmit: %s\n", fmtTime(r.Timestamps.ClientXmit))
+	fmt.Fprintf(w, " ServerRecv: %s\n", fmtTime(r.Timestamps.ServerRecv))
+	fmt.Fprintf(w, " ServerXmit: %s\n", fmtTime(r.Timestamps.ServerXmit))
+	fmt.Fprintf(w, " ClientRecv: %s\n", fmtTime(r.Timestamps.ClientRecv))
+	fmt.Fprintf(w, "    Stratum: %d\n", r.Stratum)
+	fmt.Fprintf(w, "       Leap: %s\n", fmtLeap(r.Leap))
+	fmt.Fprintf(w, "      Flags: %s\n", fmtFlags(r.Flags))
+	fmt.Fprintf(w, "        Era: %d\n", r.Era)
+	fmt.Fprintf(w, "  Timescale: %s\n", fmtTimescale(r.Timescale))
+	fmt.Fprintf(w, "       Poll: %s\n", r.Poll)
+	fmt.Fprintf(w, "  Precision: %s\n", r.Precision)
+	fmt.Fprintf(w, "  RootDelay: %s\n", r.RootDelay)
+	fmt.Fprintf(w, "   RootDisp: %s\n", r.RootDispersion)
+	fmt.Fprintf(w, "   RootDist: %s\n", r.RootDistance)
+	fmt.Fprintf(w, "  Supported: %v\n", r.SupportedVersions)
+	fmt.Fprintf(w, "   MinError: %s\n", r.MinError)
+	fmt.Fprintf(w, "    RefTime: %s\n", fmtTime(r.ReferenceTime))
+	if r.Version == 5 {
+		fmt.Fprintf(w, " RefIDBytes: %s\n", fmtRefIDFilter(r.ReferenceIDFilterValues))
+		fmt.Fprintf(w, " Correction: %s\n", fmtCorrection(r.Correction))
+		fmt.Fprintf(w, "    Offsets: %s\n", fmtTimescaleOffsets(r.TimescaleOffsets))
+		fmt.Fprintf(w, " MonoOffset: %s\n", r.MonotonicOffset)
+		fmt.Fprintf(w, "  MonoEpoch: %s\n", fmtEpoch(r.MonotonicEpochID))
+		fmt.Fprintf(w, "  SrvCookie: %s", fmtCookie(r.ServerCookie))
+	} else {
+		fmt.Fprintf(w, "      RefID: %s (0x%08x)\n", r.ReferenceString(), r.ReferenceID)
+		fmt.Fprintf(w, "   KissCode: %s", fmtKissCode(r.KissCode))
+	}
 }
 
 // ReferenceString returns the response's ReferenceID value formatted as a
@@ -352,8 +505,12 @@ func (r *Response) IsKissOfDeath() bool {
 // the reference clock's name is returned. If stratum is two or greater, then
 // the ID is either an IPv4 address or an MD5 hash of the IPv6 address; in
 // either case the reference string is reported as 4 dot-separated
-// decimal-based integers.
+// decimal-based integers. Valid only for NTPv3 and NTPv4.
 func (r *Response) ReferenceString() string {
+	if r.Version == 5 {
+		return ""
+	}
+
 	if r.Stratum == 0 {
 		return kissCode(r.ReferenceID)
 	}
@@ -388,19 +545,29 @@ func (r *Response) Validate() error {
 		return r.authErr
 	}
 
-	// Handle invalid stratum values.
-	if r.Stratum == 0 {
-		return ErrKissOfDeath
+	// Handle NTPv5 unsynchronized server.
+	if r.Version >= 5 && r.Flags&FlagSynchronized == 0 {
+		return ErrServerNotSynchronized
 	}
+
+	// Handle invalid stratum values.
 	if r.Stratum >= maxStratum {
 		return ErrInvalidStratum
 	}
+	if r.Stratum == 0 {
+		if r.Version < 5 {
+			return ErrKissOfDeath
+		} else {
+			return ErrInvalidStratum
+		}
+	}
 
-	// Estimate the "freshness" of the time. If it exceeds the maximum
-	// polling interval (~36 hours), then it cannot be considered "fresh".
-	freshness := r.Time.Sub(r.ReferenceTime)
-	if freshness > maxPollInterval {
-		return ErrServerClockFreshness
+	// Estimate the "freshness" of the time. If it exceeds the maximum polling
+	// interval (~36 hours), then it cannot be considered "fresh".
+	if (r.Version < 5 && r.ReferenceTime != ntpEra0) || (r.Version == 5 && !r.ReferenceTime.IsZero()) {
+		if freshness := r.Time.Sub(r.ReferenceTime); freshness > maxPollInterval {
+			return ErrServerClockFreshness
+		}
 	}
 
 	// Calculate the peer synchronization distance, lambda:
@@ -420,7 +587,7 @@ func (r *Response) Validate() error {
 	}
 
 	// Handle invalid leap second indicator.
-	if r.Leap == LeapNotInSync {
+	if r.Version < 5 && r.Leap == LeapNotInSync {
 		return ErrInvalidLeapSecond
 	}
 
@@ -428,7 +595,7 @@ func (r *Response) Validate() error {
 	return nil
 }
 
-// Query requests time data from a remote NTP server. The response contains
+// Query requests time data from a remote NTPv4 server. The response contains
 // information from which a more accurate local time can be inferred.
 //
 // The server address is of the form "host", "host:port", "host%zone:port",
@@ -443,17 +610,69 @@ func Query(address string) (*Response, error) {
 // QueryWithOptions performs the same function as Query but allows for the
 // customization of certain query behaviors. See the comments for Query and
 // QueryOptions for further details.
-func QueryWithOptions(address string, opt QueryOptions) (*Response, error) {
-	h, now, err := getTime(address, &opt)
-	if err != nil && err != ErrAuthFailed {
+func QueryWithOptions(remoteAddress string, opt QueryOptions) (*Response, error) {
+	if opt.Version == 0 {
+		opt.Version = defaultVersion
+	}
+	if opt.Version < 3 || opt.Version > 5 {
+		return nil, ErrInvalidProtocolVersion
+	}
+
+	if opt.Timeout == 0 {
+		opt.Timeout = defaultTimeout
+	}
+	if opt.Port == 0 {
+		opt.Port = defaultPort
+	}
+
+	useKernelTime := opt.GetSystemTime == nil
+	if opt.GetSystemTime == nil {
+		opt.GetSystemTime = getSystemTime
+	}
+
+	if opt.Dial != nil {
+		// wrapper for the deprecated Dial callback.
+		opt.Dialer = func(la, ra string) (net.Conn, error) {
+			return dialWrapper(la, ra, opt.Dial)
+		}
+	}
+	if opt.Dialer == nil {
+		opt.Dialer = defaultDialer
+	}
+
+	// Compose a conforming host:port remote address string, adding the port
+	// number if necessary.
+	remoteAddress, err := fixHostPort(remoteAddress, opt.Port)
+	if err != nil {
 		return nil, err
 	}
 
-	return generateResponse(h, now, err), nil
+	// Create an NTP connection.
+	baseConn, err := opt.Dialer(opt.LocalAddress, remoteAddress)
+	if err != nil {
+		return nil, err
+	}
+
+	// Wrap the base connection in a platform-specific connection type to
+	// allow for the reading of kernel timestamps.
+	conn, err := newConn(baseConn, &opt, useKernelTime)
+	if err != nil {
+		baseConn.Close()
+		return nil, err
+	}
+	defer conn.Close()
+
+	// Perform a version-specific query. NTPv3 and NTPv4 share nearly the same
+	// client implementation, so use queryV4 for both.
+	if opt.Version == 5 {
+		return queryV5(conn, &opt)
+	} else {
+		return queryV4(conn, &opt)
+	}
 }
 
 // Time returns the current, corrected local time using information returned
-// from the remote NTP server. On error, Time returns the uncorrected local
+// from the remote NTPv4 server. On error, Time returns the uncorrected local
 // system time.
 //
 // The server address is of the form "host", "host:port", "host%zone:port",
@@ -464,174 +683,32 @@ func QueryWithOptions(address string, opt QueryOptions) (*Response, error) {
 func Time(address string) (time.Time, error) {
 	r, err := Query(address)
 	if err != nil {
-		return time.Now(), err
+		return getSystemTime().Local(), err
 	}
 
 	err = r.Validate()
 	if err != nil {
-		return time.Now(), err
+		return getSystemTime().Local(), err
 	}
 
 	// Use the response's clock offset to calculate an accurate time.
-	return time.Now().Add(r.ClockOffset), nil
+	return getSystemTime().Local().Add(r.ClockOffset), nil
 }
 
-// getTime performs the NTP server query and returns the response header
-// along with the local system time it was received.
-func getTime(address string, opt *QueryOptions) (*header, ntpTime, error) {
-	if opt.Timeout == 0 {
-		opt.Timeout = defaultTimeout
-	}
-	if opt.Version == 0 {
-		opt.Version = defaultNtpVersion
-	}
-	if opt.Version < 2 || opt.Version > 4 {
-		return nil, 0, ErrInvalidProtocolVersion
-	}
-	if opt.Port == 0 {
-		opt.Port = defaultNtpPort
-	}
-	if opt.Dial != nil {
-		// wrapper for the deprecated Dial callback.
-		opt.Dialer = func(la, ra string) (net.Conn, error) {
-			return dialWrapper(la, ra, opt.Dial)
-		}
-	}
-	if opt.Dialer == nil {
-		opt.Dialer = defaultDialer
-	}
-	if opt.GetSystemTime == nil {
-		opt.GetSystemTime = time.Now
-	}
-
-	// Compose a conforming host:port remote address string if the address
-	// string doesn't already contain a port.
-	remoteAddress, err := fixHostPort(address, opt.Port)
+// dialWrapper is used to wrap the deprecated Dial callback in QueryOptions.
+func dialWrapper(la, ra string,
+	dial func(la string, lp int, ra string, rp int) (net.Conn, error)) (net.Conn, error) {
+	rhost, rport, err := net.SplitHostPort(ra)
 	if err != nil {
-		return nil, 0, err
+		return nil, err
 	}
 
-	// Connect to the remote server.
-	con, err := opt.Dialer(opt.LocalAddress, remoteAddress)
+	rportValue, err := strconv.Atoi(rport)
 	if err != nil {
-		return nil, 0, err
-	}
-	defer con.Close()
-
-	// Set a TTL for the packet if requested.
-	if opt.TTL != 0 {
-		ipcon := ipv4.NewConn(con)
-		err = ipcon.SetTTL(opt.TTL)
-		if err != nil {
-			return nil, 0, err
-		}
+		return nil, err
 	}
 
-	// Set a timeout on the connection.
-	con.SetDeadline(time.Now().Add(opt.Timeout))
-
-	// Allocate a buffer big enough to hold an entire response datagram.
-	recvBuf := make([]byte, 8192)
-	recvHdr := new(header)
-
-	// Allocate the query message header.
-	xmitHdr := new(header)
-	xmitHdr.setMode(client)
-	xmitHdr.setVersion(opt.Version)
-	xmitHdr.setLeap(LeapNoWarning)
-	xmitHdr.Precision = 0x20
-
-	// To help prevent spoofing and client fingerprinting, use a
-	// cryptographically random 64-bit value for the TransmitTime. See:
-	// https://www.ietf.org/archive/id/draft-ietf-ntp-data-minimization-04.txt
-	bits := make([]byte, 8)
-	_, err = rand.Read(bits)
-	if err != nil {
-		return nil, 0, err
-	}
-	xmitHdr.TransmitTime = ntpTime(binary.BigEndian.Uint64(bits))
-
-	// Write the query header to a transmit buffer.
-	var xmitBuf bytes.Buffer
-	binary.Write(&xmitBuf, binary.BigEndian, xmitHdr)
-
-	// Allow extensions to process the query and add to the transmit buffer.
-	for _, e := range opt.Extensions {
-		err = e.ProcessQuery(&xmitBuf)
-		if err != nil {
-			return nil, 0, err
-		}
-	}
-
-	// If using symmetric key authentication, decode and validate the auth key
-	// string.
-	authKey, err := decodeAuthKey(opt.Auth)
-	if err != nil {
-		return nil, 0, err
-	}
-
-	// Append a MAC if authentication is being used.
-	appendMAC(&xmitBuf, opt.Auth, authKey)
-
-	// Transmit the query and keep track of when it was transmitted.
-	xmitTime := opt.GetSystemTime()
-	_, err = con.Write(xmitBuf.Bytes())
-	if err != nil {
-		return nil, 0, err
-	}
-
-	// Receive the response.
-	recvBytes, err := con.Read(recvBuf)
-	if err != nil {
-		return nil, 0, err
-	}
-
-	// Keep track of the time the response was received. As of go 1.9, the
-	// time package uses a monotonic clock, so delta will never be less than
-	// zero for go version 1.9 or higher.
-	recvTime := opt.GetSystemTime()
-	if recvTime.Sub(xmitTime) < 0 {
-		recvTime = xmitTime
-	}
-
-	// Parse the response header.
-	recvBuf = recvBuf[:recvBytes]
-	recvReader := bytes.NewReader(recvBuf)
-	err = binary.Read(recvReader, binary.BigEndian, recvHdr)
-	if err != nil {
-		return nil, 0, err
-	}
-
-	// Allow extensions to process the response.
-	for i := len(opt.Extensions) - 1; i >= 0; i-- {
-		err = opt.Extensions[i].ProcessResponse(recvBuf)
-		if err != nil {
-			return nil, 0, err
-		}
-	}
-
-	// Check for invalid fields.
-	if recvHdr.getMode() != server {
-		return nil, 0, ErrInvalidMode
-	}
-	if recvHdr.TransmitTime == ntpTime(0) {
-		return nil, 0, ErrInvalidTransmitTime
-	}
-	if recvHdr.OriginTime != xmitHdr.TransmitTime {
-		return nil, 0, ErrServerResponseMismatch
-	}
-	if recvHdr.ReceiveTime > recvHdr.TransmitTime {
-		return nil, 0, ErrServerTickedBackwards
-	}
-
-	// Correct the received message's origin time using the actual
-	// transmit time.
-	recvHdr.OriginTime = toNtpTime(xmitTime)
-
-	// Perform authentication of the server response.
-	authErr := verifyMAC(recvBuf, opt.Auth, authKey)
-
-	return recvHdr, toNtpTime(recvTime), authErr
+	return dial(la, 0, rhost, rportValue)
 }
 
 // defaultDialer provides a UDP dialer based on Go's built-in net stack.
@@ -653,24 +730,8 @@ func defaultDialer(localAddress, remoteAddress string) (net.Conn, error) {
 	return net.DialUDP("udp", laddr, raddr)
 }
 
-// dialWrapper is used to wrap the deprecated Dial callback in QueryOptions.
-func dialWrapper(la, ra string,
-	dial func(la string, lp int, ra string, rp int) (net.Conn, error)) (net.Conn, error) {
-	rhost, rport, err := net.SplitHostPort(ra)
-	if err != nil {
-		return nil, err
-	}
-
-	rportValue, err := strconv.Atoi(rport)
-	if err != nil {
-		return nil, err
-	}
-
-	return dial(la, 0, rhost, rportValue)
-}
-
-// fixHostPort examines an address in one of the accepted forms and fixes it
-// to include a port number if necessary.
+// fixHostPort examines an address in one of the accepted forms and modifies
+// it to include a port number if necessary.
 func fixHostPort(address string, defaultPort int) (fixed string, err error) {
 	if len(address) == 0 {
 		return "", errors.New("address string is empty")
@@ -697,9 +758,8 @@ func fixHostPort(address string, defaultPort int) (fixed string, err error) {
 		return fmt.Sprintf("%s:%d", address, defaultPort), nil
 	}
 
-	// Exactly one colon? A port have been included along with an IPv4 or
-	// domain address. (IPv6 addresses are guaranteed to have more than one
-	// colon.)
+	// Exactly one colon? A port wasincluded along with an IPv4 or domain
+	// address. (IPv6 addresses are guaranteed to have more than one colon.)
 	prev := strings.LastIndexByte(address[:last], ':')
 	if prev < 0 {
 		return address, nil
@@ -709,94 +769,62 @@ func fixHostPort(address string, defaultPort int) (fixed string, err error) {
 	return fmt.Sprintf("[%s]:%d", address, defaultPort), nil
 }
 
-// generateResponse processes NTP header fields along with the its receive
-// time to generate a Response record.
-func generateResponse(h *header, recvTime ntpTime, authErr error) *Response {
-	r := &Response{
-		Time:           h.TransmitTime.Time(),
-		ClockOffset:    offset(h.OriginTime, h.ReceiveTime, h.TransmitTime, recvTime),
-		RTT:            rtt(h.OriginTime, h.ReceiveTime, h.TransmitTime, recvTime),
-		Precision:      toInterval(h.Precision),
-		Version:        h.getVersion(),
-		Stratum:        h.Stratum,
-		ReferenceID:    h.ReferenceID,
-		ReferenceTime:  h.ReferenceTime.Time(),
-		RootDelay:      h.RootDelay.Duration(),
-		RootDispersion: h.RootDispersion.Duration(),
-		Leap:           h.getLeap(),
-		MinError:       minError(h.OriginTime, h.ReceiveTime, h.TransmitTime, recvTime),
-		Poll:           toInterval(h.Poll),
-		authErr:        authErr,
-	}
+// NTP eras
+var (
+	ntpEraLength = time.Duration(int64(time.Second) << 32)
+	ntpEra0      = time.Date(1900, 1, 1, 0, 0, 0, 0, time.UTC)
+	ntpEra1      = ntpEra0.Add(ntpEraLength)
+)
 
-	// Calculate values depending on other calculated values
-	r.RootDistance = rootDistance(r.RTT, r.RootDelay, r.RootDispersion)
-
-	// If a kiss of death was received, interpret the reference ID as
-	// a kiss code.
-	if r.Stratum == 0 {
-		r.KissCode = kissCode(r.ReferenceID)
-	}
-
-	return r
+// getEra determines the NTP era for the provided time.
+func getEra(t time.Time) int64 {
+	ntpSec := uint64(t.Unix() - ntpEra0.Unix())
+	return int64(ntpSec >> 32)
 }
 
-// The following helper functions calculate additional metadata about the
-// timestamps received from an NTP server.  The timestamps returned by
-// the server are given the following variable names:
-//
-//   org = Origin Timestamp (client send time)
-//   rec = Receive Timestamp (server receive time)
-//   xmt = Transmit Timestamp (server reply time)
-//   dst = Destination Timestamp (client receive time)
-
-func rtt(org, rec, xmt, dst ntpTime) time.Duration {
-	a := int64(dst - org)
-	b := int64(xmt - rec)
-	rtt := a - b
-	if rtt < 0 {
-		rtt = 0
-	}
-	return ntpTime(rtt).Duration()
+// offset calculates an uncorrected clock offset using the four NTP
+// timestamps.
+func offset(t1, t2, t3, t4 time.Time) time.Duration {
+	return (t2.Sub(t1) + t3.Sub(t4)) / 2
 }
 
-func offset(org, rec, xmt, dst ntpTime) time.Duration {
-	// The inputs are 64-bit unsigned integer timestamps. These timestamps can
-	// "roll over" at the end of an NTP era, which occurs approximately every
-	// 136 years starting from the year 1900. To ensure an accurate offset
-	// calculation when an era boundary is crossed, we need to take care that
-	// the difference between two 64-bit timestamp values is accurately
-	// calculated even when they are in neighboring eras.
+// rtt calculates the round-trip-time delay using the four NTP timestamps.
+func rtt(t1, t2, t3, t4 time.Time) time.Duration {
+	return max(t4.Sub(t1)-t3.Sub(t2), 0)
+}
+
+// minError calculates a lower bound on the "causality violation" detected
+// between the client and server clocks when they are not yet synchronized.
+func minError(t1, t2, t3, t4 time.Time) time.Duration {
+	// rtt    = (t4 - t1) - (t3 - t2)
+	// offset = ((t2 - t1) + (t3 - t4)) / 2
 	//
-	// See: https://www.eecis.udel.edu/~mills/y2k.html
+	// t2 - t1 = rtt/2 + offset
+	// t4 - t3 = rtt/2 - offset
+	//
+	// If the client and server clocks are synchronized, then the offset
+	// should be roughly zero and the timestamp differences should be roughly
+	// equal to the one-way trip time (rtt/2). If the clocks are not
+	// synchronized, then the magnitude of the offset relative to the one-way
+	// trip time provides a lower bound on the "causality violation" between
+	// the two clocks.
 
-	a := int64(rec - org)
-	b := int64(xmt - dst)
-	offset := a + (b-a)/2
+	offset := offset(t1, t2, t3, t4)
 	if offset < 0 {
-		return -ntpTime(-offset).Duration()
+		offset = -offset
 	}
-	return ntpTime(offset).Duration()
+
+	rtt := rtt(t1, t2, t3, t4)
+	ott := rtt / 2
+
+	if offset > ott {
+		return offset - ott
+	}
+	return 0
 }
 
-func minError(org, rec, xmt, dst ntpTime) time.Duration {
-	// Each NTP response contains two pairs of send/receive timestamps.
-	// When either pair indicates a "causality violation", we calculate the
-	// error as the difference in time between them. The minimum error is
-	// the greater of the two causality violations.
-	var error0, error1 ntpTime
-	if org >= rec {
-		error0 = org - rec
-	}
-	if xmt >= dst {
-		error1 = xmt - dst
-	}
-	if error0 > error1 {
-		return error0.Duration()
-	}
-	return error1.Duration()
-}
-
+// rootDistance estimates the root distance between the client and the stratum
+// 1 server.
 func rootDistance(rtt, rootDelay, rootDisp time.Duration) time.Duration {
 	// The root distance is:
 	// 	the maximum error due to all causes of the local clock
@@ -814,30 +842,213 @@ func rootDistance(rtt, rootDelay, rootDisp time.Duration) time.Duration {
 	return totalDelay/2 + rootDisp
 }
 
+// randUint64 creates a random non-zero 64-bit cookie value.
+func randUint64() (uint64, error) {
+	for range 4 {
+		var cookieBytes [8]byte
+		_, err := rand.Read(cookieBytes[:])
+		if err != nil {
+			return 0, err
+		}
+
+		cookie := binary.BigEndian.Uint64(cookieBytes[:])
+		if cookie != 0 {
+			return cookie, nil
+		}
+	}
+	return 0, errors.New("failed to generate non-zero random value")
+}
+
+// An timestamp is a 64-bit fixed-point (Q32.32) representation of the
+// number of seconds elapsed.
+type timestamp uint64
+
+// Duration interprets the fixed-point timestamp as a number of elapsed
+// seconds and returns the corresponding time.Duration value.
+func (t timestamp) Duration() time.Duration {
+	t0 := uint64(t>>32) * nanoPerSec
+	f1 := uint64(t&mask32) * nanoPerSec
+	t1 := f1 >> 32
+	t1 += uint64((f1&mask32)+half32) >> 32 // round half up
+	return time.Duration(t0 + t1)
+}
+
+// Time interprets a timestamp value as an absolute time, using the provided
+// era number to disambiguate the time period.
+func (t timestamp) Time(era uint8) time.Time {
+	eraStart := ntpEra0.Add(time.Duration(era) * ntpEraLength)
+	return eraStart.Add(t.Duration())
+}
+
+// TimeV4 interprets the NTPv3/NTPv4 timestamp value as an absolute time and
+// returns the corresponding time.Time value.
+func (t timestamp) TimeV4() time.Time {
+	if inferEra(t) == 1 {
+		return ntpEra1.Add(t.Duration())
+	}
+	return ntpEra0.Add(t.Duration())
+}
+
+// inferEra infers an NTP era from a timestamp value. This function is used
+// only for NTPv3 and NTPv4 timestamps.
+func inferEra(t timestamp) uint8 {
+	// Assume NTP era 1 (year 2036+) if the raw timestamp suggests a year
+	// before 1970. Otherwise assume NTP era 0. This allows us to properly
+	// handle the rollover from era 0 to 1 when converting timestamps to
+	// times.
+	const t1970 = 0x83aa_7e80_0000_0000
+	if uint64(t) < t1970 {
+		return 1
+	}
+	return 0
+}
+
+// toTimestamp converts a Time value into its 64-bit fixed-point timestamp
+// representation.
+func toTimestamp(t time.Time) timestamp {
+	era := getEra(t)
+	eraStart := ntpEra0.Add(time.Duration(era) * ntpEraLength)
+
+	nsec := uint64(t.Sub(eraStart))
+	sec := nsec / nanoPerSec
+
+	remainder := nsec - sec*nanoPerSec
+	remainderShifted := remainder << 32
+	frac := (remainderShifted + nanoPerSec/2) / nanoPerSec
+	return timestamp(sec<<32 | frac)
+}
+
+// toInterval converts an NTP poll interval exponent into a time.Duration.
 func toInterval(t int8) time.Duration {
 	switch {
 	case t > 0:
-		return time.Duration(uint64(time.Second) << uint(t))
+		return time.Duration(int64(time.Second) << int(t))
 	case t < 0:
-		return time.Duration(uint64(time.Second) >> uint(-t))
+		return time.Duration(int64(time.Second) >> int(-t))
 	default:
 		return time.Second
 	}
 }
 
-func kissCode(id uint32) string {
-	isPrintable := func(ch byte) bool { return ch >= 32 && ch <= 126 }
+func fmtCookie(c uint64) string {
+	if c == 0 {
+		return "<zero>"
+	}
+	return fmt.Sprintf("0x%016x", c)
+}
 
-	b := [4]byte{
-		byte(id >> 24),
-		byte(id >> 16),
-		byte(id >> 8),
-		byte(id),
+func fmtCorrection(c Correction) string {
+	if c.OriginDelay < 0 || c.ReturnDelay < 0 {
+		return "<invalid>"
 	}
-	for _, ch := range b {
-		if !isPrintable(ch) {
-			return ""
+	if c.OriginPathID == 0 && c.ReturnPathID == 0 {
+		return "<none>"
+	}
+	return fmt.Sprintf("%s (0x%04x) / %s (0x%04x)",
+		c.OriginDelay, c.OriginPathID,
+		c.ReturnDelay, c.ReturnPathID)
+}
+
+func fmtEpoch(epoch uint32) string {
+	if epoch == 0 {
+		return "<zero>"
+	}
+	return fmt.Sprintf("0x%08x", epoch)
+}
+
+func fmtKissCode(s string) string {
+	if s == "" {
+		return "<empty>"
+	}
+	return s
+}
+
+func fmtLeap(li LeapIndicator) string {
+	switch li {
+	case LeapNoWarning:
+		return "No Warning"
+	case LeapAddSecond:
+		return "Add Second"
+	case LeapDelSecond:
+		return "Delete Second"
+	default:
+		return "Unknown"
+	}
+}
+
+func fmtRefIDFilter(filter []byte) string {
+	if filter == nil {
+		return "<nil>"
+	}
+	l := min(len(filter), 24)
+	return "0x" + hex.EncodeToString(filter[:l]) + "..."
+}
+
+func fmtFlags(flags ResponseFlags) string {
+	ftab := map[ResponseFlags]string{
+		FlagSynchronized: "Synchronized",
+		FlagInterleaved:  "Interleaved",
+	}
+
+	copy := flags
+	var s strings.Builder
+	s.WriteString("[")
+	for flags != 0 {
+		f := flags & -flags
+		if s.Len() > 1 {
+			s.WriteString(" ")
 		}
+		if ss, ok := ftab[f]; ok {
+			s.WriteString(ss)
+		} else {
+			s.WriteString("Unknown")
+		}
+		flags &= ^f
 	}
-	return string(b[:])
+	fmt.Fprintf(&s, "] (0x%08x)", uint32(copy))
+	return s.String()
+}
+
+func fmtTime(value time.Time) string {
+	if value.Equal(ntpEra0) {
+		return "<invalid>"
+	}
+	return value.Format(timeFormat)
+}
+
+func fmtTimescale(ts Timescale) string {
+	switch ts {
+	case TimescaleUTC:
+		return "UTC"
+	case TimescaleTAI:
+		return "TAI"
+	case TimescaleUT1:
+		return "UT1"
+	case TimescaleUTCSmeared:
+		return "UTC(smeared)"
+	default:
+		return "Unknown"
+	}
+}
+
+func fmtTimescaleOffset(o TimescaleOffset) string {
+	return fmt.Sprintf("%s=%v", fmtTimescale(o.Timescale), o.Offset)
+}
+
+func fmtTimescaleOffsets(offsets []TimescaleOffset) string {
+	if offsets == nil {
+		return "<none>"
+	}
+
+	var s strings.Builder
+	s.WriteString("[")
+	for i, o := range offsets {
+		if i > 0 {
+			s.WriteString(", ")
+		}
+		s.WriteString(fmtTimescaleOffset(o))
+	}
+	s.WriteString("]")
+
+	return s.String()
 }

@@ -1,11 +1,10 @@
-// Copyright © 2015-2023 Brett Vickers.
+// Copyright © Brett Vickers.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
 package ntp
 
 import (
-	"bytes"
 	"crypto/aes"
 	"crypto/md5"
 	"crypto/sha1"
@@ -17,17 +16,19 @@ import (
 )
 
 // AuthType specifies the cryptographic hash algorithm used to generate a
-// symmetric key authentication digest (or CMAC) for an NTP message. Please
-// note that MD5 and SHA1 are no longer considered secure; they appear here
-// solely for compatibility with existing NTP server implementations.
+// symmetric key authentication code for an NTP message. Please note that MD5
+// and SHA1 are no longer considered secure and have been deprecated for use
+// with NTP; they appear here solely for compatibility with older NTP server
+// implementations. In general, the AES-128-CMAC algorithm should be used if
+// the server supports it (see RFC 8573).
 type AuthType int
 
 const (
-	AuthNone   AuthType = iota // no authentication
-	AuthMD5                    // MD5 digest
-	AuthSHA1                   // SHA-1 digest
-	AuthSHA256                 // SHA-2 digest (256 bits)
-	AuthSHA512                 // SHA-2 digest (512 bits)
+	AuthNone   AuthType = iota // no symmetric key authentication
+	AuthMD5                    // MD5
+	AuthSHA1                   // SHA-1
+	AuthSHA256                 // SHA2-256
+	AuthSHA512                 // SHA2-512
 	AuthAES128                 // AES-128-CMAC
 	AuthAES256                 // AES-256-CMAC
 )
@@ -36,7 +37,7 @@ const (
 // for an NTP query.
 type AuthOptions struct {
 	// Type determines the cryptographic hash algorithm used to compute the
-	// authentication digest or CMAC.
+	// authentication code.
 	Type AuthType
 
 	// The cryptographic key used by the client to perform authentication. The
@@ -48,22 +49,22 @@ type AuthOptions struct {
 
 	// The identifier used by the NTP server to identify which key to use
 	// for authentication purposes.
-	KeyID uint16
+	KeyID uint32
 }
 
 var algorithms = []struct {
 	MinKeySize int
 	MaxKeySize int
-	DigestSize int
-	CalcDigest func(payload, key []byte) []byte
+	MACSize    int
+	CalcMAC    func(payload, key []byte) []byte
 }{
-	{0, 0, 0, nil},                 // AuthNone
-	{4, 32, 16, calcDigest_MD5},    // AuthMD5
-	{4, 32, 20, calcDigest_SHA1},   // AuthSHA1
-	{4, 32, 20, calcDigest_SHA256}, // AuthSHA256
-	{4, 32, 20, calcDigest_SHA512}, // AuthSHA512
-	{16, 16, 16, calcCMAC_AES},     // AuthAES128
-	{32, 32, 16, calcCMAC_AES},     // AuthAES256
+	{0, 0, 0, nil},               // AuthNone
+	{4, 32, 16, calcDigest_MD5},  // AuthMD5
+	{4, 32, 20, calcHash_SHA1},   // AuthSHA1
+	{4, 32, 32, calcHash_SHA256}, // AuthSHA256
+	{4, 32, 64, calcHash_SHA512}, // AuthSHA512
+	{16, 16, 16, calcCMAC_AES},   // AuthAES128
+	{32, 32, 16, calcCMAC_AES},   // AuthAES256
 }
 
 func calcDigest_MD5(payload, key []byte) []byte {
@@ -71,19 +72,19 @@ func calcDigest_MD5(payload, key []byte) []byte {
 	return digest[:]
 }
 
-func calcDigest_SHA1(payload, key []byte) []byte {
-	digest := sha1.Sum(append(key, payload...))
-	return digest[:]
+func calcHash_SHA1(payload, key []byte) []byte {
+	hash := sha1.Sum(append(key, payload...))
+	return hash[:]
 }
 
-func calcDigest_SHA256(payload, key []byte) []byte {
-	digest := sha256.Sum256(append(key, payload...))
-	return digest[:20]
+func calcHash_SHA256(payload, key []byte) []byte {
+	hash := sha256.Sum256(append(key, payload...))
+	return hash[:]
 }
 
-func calcDigest_SHA512(payload, key []byte) []byte {
-	digest := sha512.Sum512(append(key, payload...))
-	return digest[:20]
+func calcHash_SHA512(payload, key []byte) []byte {
+	hash := sha512.Sum512(append(key, payload...))
+	return hash[:]
 }
 
 func calcCMAC_AES(payload, key []byte) []byte {
@@ -114,7 +115,7 @@ func calcCMAC_AES(payload, key []byte) []byte {
 		xor(cmac, payload)
 		xor(cmac, k1)
 	} else {
-		xor(cmac, pad(payload))
+		xor(cmac, padblock(payload))
 		xor(cmac, k2)
 	}
 	c.Encrypt(cmac, cmac)
@@ -122,7 +123,7 @@ func calcCMAC_AES(payload, key []byte) []byte {
 	return cmac
 }
 
-func pad(block []byte) []byte {
+func padblock(block []byte) []byte {
 	pad := make([]byte, 16-len(block))
 	pad[0] = 0x80
 	return append(block, pad...)
@@ -156,10 +157,6 @@ func xor(dst, src []byte) {
 }
 
 func decodeAuthKey(opt AuthOptions) (key []byte, err error) {
-	if opt.Type == AuthNone {
-		return nil, nil
-	}
-
 	var keyIn string
 	var isHex bool
 	switch {
@@ -193,48 +190,18 @@ func decodeAuthKey(opt AuthOptions) (key []byte, err error) {
 	return key, nil
 }
 
-func appendMAC(buf *bytes.Buffer, opt AuthOptions, key []byte) {
-	if opt.Type == AuthNone {
-		return
+func getMACSize(version int, authType AuthType) int {
+	a := algorithms[authType]
+	if version == 4 {
+		// Truncate to 20 bytes for NTPv4.
+		return min(a.MACSize, 20)
 	}
-
-	a := algorithms[opt.Type]
-	payload := buf.Bytes()
-	digest := a.CalcDigest(payload, key)
-	binary.Write(buf, binary.BigEndian, uint32(opt.KeyID))
-	binary.Write(buf, binary.BigEndian, digest)
+	return a.MACSize
 }
 
-func verifyMAC(buf []byte, opt AuthOptions, key []byte) error {
-	if opt.Type == AuthNone {
-		return nil
-	}
-
-	// Validate that there are enough bytes at the end of the message to
-	// contain a MAC.
-	const headerSize = 48
-	a := algorithms[opt.Type]
-	macLen := 4 + a.DigestSize
-	remain := len(buf) - headerSize
-	if remain < macLen || (remain%4) != 0 {
-		return ErrAuthFailed
-	}
-
-	// The key ID returned by the server must be the same as the key ID sent
-	// to the server.
-	payloadLen := len(buf) - macLen
-	mac := buf[payloadLen:]
-	keyID := binary.BigEndian.Uint32(mac[:4])
-	if keyID != uint32(opt.KeyID) {
-		return ErrAuthFailed
-	}
-
-	// Calculate and compare digests.
-	payload := buf[:payloadLen]
-	digest := a.CalcDigest(payload, key)
-	if subtle.ConstantTimeCompare(digest, mac[4:]) != 1 {
-		return ErrAuthFailed
-	}
-
-	return nil
+func calcMAC(version int, authType AuthType, key []byte, payload []byte) []byte {
+	a := algorithms[authType]
+	mac := a.CalcMAC(payload, key)
+	size := getMACSize(version, authType)
+	return mac[:size]
 }
