@@ -22,8 +22,8 @@ github.com/prometheus/procfs v0.22.0 h1:6q9+/JL9IKAPbCmBrv9n5O5Ty3NKnciV5X7YGw0o
 github.com/prometheus/procfs v0.22.0/go.mod h1:CvmFr/GVhIjIvWJZW3tgkODBQMRIf0EyWMQLHCHab58=
 github.com/sapcc/go-api-declarations v1.25.1 h1:Lrbf8TZY/ARg0J9IrlrObqnXjrzSzmYKQd/L/a71Lsg=
 github.com/sapcc/go-api-declarations v1.25.1/go.mod h1:bJkK8wphzlmUmN5lxBv8BbfxUXMOkW+UiC10xBHXsFs=
-github.com/sapcc/go-bits v0.0.0-20261013222358-416f3ade2c19 h1:JKZe05UIn70AalARFEN5IKSh7yhb6wPCEUNn/41VNM8=
-github.com/sapcc/go-bits v0.0.0-20261013222358-416f3ade2c19/go.mod h1:Z2uDp3zty2oJAXAVZZaUazo3uGZ6G2zBfauNtEl+EHw=
+github.com/sapcc/go-bits v0.0.0-20261022170030-e86fd39c4acb h1:gKUNr2yRhvl899EW4/Y+ZT+fMN7pqtJWTfTJaAuGrNI=
+github.com/sapcc/go-bits v0.0.0-20261022170030-e86fd39c4acb/go.mod h1:Z2uDp3zty2oJAXAVZZaUazo3uGZ6G2zBfauNtEl+EHw=
 github.com/stretchr/testify v1.12.1 h1:EuwCh5fleGS7H32xRwO3wRGT7DxrDhLAT6FF8MpWDWE=
 github.com/stretchr/testify v1.12.1/go.mod h1:MDEgiDPPsNp5cuIrHPPCyornHKgEVbtFUmoNlxoYthg=
 go.uber.org/goleak v1.3.0 h1:2K3zAYmnTNqV73imy9J1T3WC+gmCePx2hEGkimedGto=
