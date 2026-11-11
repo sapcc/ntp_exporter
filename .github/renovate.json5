@@ -77,6 +77,7 @@
         ".github/workflows/checks.yaml",
         ".github/workflows/ci.yaml",
         ".github/workflows/codeql.yaml",
+        ".github/workflows/run-go-makefile-maker.yaml",
         ".github/workflows/container-registry-ghcr.yaml",
         ".github/workflows/goreleaser.yaml",
         ".github/workflows/release-pr.yaml"
